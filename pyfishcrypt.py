@@ -3,192 +3,37 @@
 #
 # FiSH/Mircryption clone for X-Chat in 100% Python
 #
-# Requirements: PyCrypto, and Python 2.5+
-#
-# Copyright 2011 Nam T. Nguyen ( http://www.vithon.org/forum/Thread/show/54 )
-# Released under the BSD license
-#
-# rewritten by trubo/segfault for irc.prooops.eu #py-fishcrypt trubo00@gmail.com
-#
-# irccrypt module is copyright 2009 Bjorn Edstrom ( http://www.bjrn.se/ircsrp )
-# with modification from Nam T. Nguyen and trubo
+# Copyright 2012 trubo/segfault for irc.prooops.eu #py-fishcrypt trubo00+fish@gmail.com
+# Released under the GPL
 #
 # Changelog:
-#   * 4.21
-#      + Fixed Empty Action /me
-
-#   * 4.20
-#      + Added support for Stealth mode >> no KeyExchange possible [/SET FISHSTEALTH True/False] 
-
-#   * 4.19
-#      + Added support for mIRC CBC KeyExchange, https://github.com/flakes/mirc_fish_10/ 
-
-#   * 4.18
-#      + Buffix Topic use key from channel not context
-
-#   * 4.17
-#      + CBC Default
-
-#   * 4.16
-#      + Bugfix Topic
-#      + config plaintextmarker in keyprotection
-#      + config parameter DEFAULTPROTECT and DEFAULTCBC
-
-#   * 4.15
-#      + Destroy object
-
-#   * 4.14
-#      + Stable
-
-#   * 4.13
-#      + new NickTrace
-#      + wildcard /KEY search
-#      + msg send to other target are marked with "Message Send"
-#      + Tab Completion for udpate command
-#      + using strxor from the pyCrypto packages if available
-#      + some performance enhancements
-#      + Pseudo Threading for Windows
-
-#   * 4.12
-#      + Beta Support
-
-#   * 4.11
-#      + BugFix /UPDATE
-
-#   * 4.10
-#      + BugFix /FISHSETUP
-
-#   * 4.09
-#      + BugFix again /FISHSETUP /UPDATE
-
-#   * 4.08
-#      + BugFix settings are not saved
-
-#   * 4.07
-#      + new Update function
-
-#   * 4.06
-#      + Small BugFixes
-
-#   * 4.05
-#      + BugFix Windows has no full xchatdir now using scriptpath for fish3.pickle
-
-#   * 4.04
-#      + BugFix notices
-
-#   * 4.03
-#      + BugFix /FISHSETUP
-
-#   * 4.02
-#      + noproxy oprions for /FISHSETUP
-
-#   * 4.01
-#      + BugFix pyBlowfish
-
-#   * 4.00
-#      + Windows Support with pyBlowfish.py and irccrypt now included
-
-#   * 3.31
-#      + BugFix unpack large messages
-
-#   * 3.30
-#      + Added chksum for irccrypt with __module_name__ tags http://pastebin.com/vTrWyBKv
-
-#   * 3.29
-#      + BugFix Update and Threaded Update
-
-#   * 3.28
-#      + /SET [fishcrypt]
-
-#   * 3.27
-#      + BugFix /ME+ in Query
-
-#   * 3.26
-#      + Updates over Proxy
-
-#   * 3.25
-#      + crypted /ME+ 
-
-#   * 3.24
-#      + BugFix topic 332
-
-#   * 3.23
-#      + BugFix notice send
-
-#   * 3.22
-#      + BugFix
-
-#   * 3.21
-#      + BugFix
-
-#   * 3.20
-#      + partly show incomplete messages
-
-#   * 3.19
-#      + /FISHUPDATE update switch
-
-#   * 3.18
-#      + AUTO CBC Mode only in querys
-
-#   * 3.17
-#      + Highlight Bugfix
-
-#   * 3.16
-#      + Highlight
-
-#   * 3.15
-#      + Bugfixes
-
-#   * 3.13
-#      + split lines if longer then 334 Chars 
-#
-#   * 3.12
-#      + add PROTECTKEY to block dh1080 keyexchange on known Keys ( thx ^V^ )
-#
-#   * 3.11
-#      + add Keystorage encryption
-#to
-#   * 3.10
-#      + Fix Path for Windows and provide download URL for pycrypto
-#
-#   * 3.09
-#      + Bugfixes
-#
-#   * 3.08:
-#      + some docu added
-#
-#   * 3.07:
-#      + fixed notice in channel not send to user 
-#
-#   * 3.06:
-#	   + support for /msg /msg+ /notice /notice+ (trubo)
-#
-#   * 3.04:
-#	   + new lock design (by target) (trubo)
-#
-#   * 3.01:
-#	   + change switches to be compatible with fish.secure.la/xchat/FiSH-XChat.txt (trubo)
-#
-#	* 3.0:
-#	   + rewritten to class XChatCrypt (trubo)
-#
-#   * 2.0:
-#      + Suport network mask in /key command
-#      + Alias key_exchange to keyx
-#      + Support plaintext marker '+p '
-#      + Support encrypted key store
-#
-#   * 1.0:
-#      + Initial release
+#   * 5.0:
+#      + start from scratch
 #
 ###
 
+import sys,os,binascii,hashlib,struct,re,uuid,time,errno,copy
+from math import log
 
-__module_name__ = 'fishcrypt'
-__module_version__ = '4.21'
-__module_description__ = 'fish encryption in pure python'
+## Internationalization
+#try:
+#    import gettext
+#except ImportError:
+_ = lambda x:x
 
-ISBETA = ""
+try:
+    import simplejson as json
+except ImportError:
+    import json
+
+SCRIPT_NAME = "fishcrypt"
+SCRIPT_AUTHOR = "trubo <trubo00-fish@gmail.com> / segfault"
+SCRIPT_VERSION = "5.0"
+SCRIPT_LICENSE = "GPL3"
+SCRIPT_DESC = _('fish encryption in pure python')
+
+
+ISBETA = "beta20120924-1532"
 
 UPDATEURL = 'http://pastebin.com/raw.php?i=ZWGAhvix'
 BETAUPDATEURL = 'http://pastebin.com/raw.php?i=MFUhcYA2'
@@ -198,42 +43,28 @@ SOCKSIPYURL = 'http://socksipy-branch.googlecode.com/svn/trunk/socks.py'
 ONMODES = ["Y","y","j","J","1","yes","on","ON","Yes","True","true"]
 YESNO = lambda x: (x==0 and "N") or "Y"
 
-import sys
-import os
-import re
-import base64
-import hashlib
-import struct
-import time
+DEBUGCHANNEL='>>debug<<'
+#DEBUGCHANNEL=''
 
-from math import log
-
-try:
-    import xchat
-except ImportError:
-    sys.exit("should be run from xchat plugin with python enabled")
-
-try:
-    import cPickle as pickle
-except ImportError:
-    import pickle
+## check for valid irc target
+VALID_IRC_TARGET_RE = re.compile("^[a-z_\-\[\]\\^{}|`#][a-z0-9_\-\[\]\\^{}|`]")
+## only get the real nick not any prefix
+VALID_IRC_NICK_RE   = re.compile("[a-z_\-\[\]\\^{}|`][a-z0-9_\-\[\]\\^{}|`]$")
+IRC_PRIVMSG_RE      = re.compile("(:(?P<from>(?P<from_nick>.+?)!(?P<from_user>.+?)@(?P<from_host>.+?))\ )?PRIVMSG\ (?P<to>.+?)\ :(?P<text>.+)")
 
 ## check for Windows
-import platform
-sep = "/"
-isWindows = (platform.system() == "Windows")
-if isWindows:
-    sep = "\\"
+IS_WINDOWS = sys.platform.startswith("win")
 
-## append current path
-import inspect
-scriptname = inspect.currentframe().f_code.co_filename
-script = "".join(scriptname.split(sep)[-1:])
-path = sep.join(scriptname.split(sep)[:-1])
-sys.path.insert(1,path)
+def prnt(msg,tochannel=''):
+    print msg
 
-SCRIPTCHKSUM = hashlib.sha1(open(scriptname,'rb').read()).hexdigest()
-REQUIRESETUP = False
+def debug(msg,*args, **kwargs):
+    dbgmsg = "DEBUG: %s" % (msg,)
+    if args:
+        dbgmsg = "%s [%r]" % (dbgmsg,args)
+    if kwargs:
+        dbgmsg = "%s [%r]" % (dbgmsg,kwargs)
+    prnt (dbgmsg,tochannel=DEBUGCHANNEL)
 
 try:
     import Crypto.Cipher.Blowfish as cBlowfish
@@ -242,33 +73,26 @@ except ImportError:
         import pyBlowfish as cBlowfish
         pyBlowfishlocation = "%s.py" % str(cBlowfish)[str(cBlowfish).find("from '")+6:str(cBlowfish).find(".py")]
         chksum = hashlib.sha1(open(pyBlowfishlocation,'rb').read()).hexdigest()
-        validVersion = {'35c1b6cd5af14add86dc0cf3f0309a185c308dcd':0.4,'877ae9de309685c975a6d120760c1ff9b4c55719':0.5, '57117e7c9c7649bf490589b7ae06a140e82664c6':0.5}.get(chksum,-1)
-        if validVersion == -1:
-            print "\0034** Loaded pyBlowfish.py with checksum: %s is untrusted" % (chksum)
+        if chksum in ['877ae9de309685c975a6d120760c1ff9b4c55719','57117e7c9c7649bf490589b7ae06a140e82664c6']:
+            prnt (_("\0034** Loaded pyBlowfish.py with checksum: %s is untrusted") % chksum)
         else:
-            if validVersion < 0.5:
-                print "\0034** Loaded pyBlowfish.py (%.1f) with checksum: %s is too old" % (validVersion,chksum)
-                REQUIRESETUP = True
-            else:
-                print "\0033** Loaded pyBlowfish.py Version %.1f with checksum: %s" % (validVersion,chksum)
+            prnt (_("\0033** Loaded pyBlowfish.py with checksum: %s") % chksum)
 
     except ImportError:
-        import platform
-        print "\002\0034No Blowfish implementation"
-        if not isWindows:
-            print "This module requires PyCrypto / The Python Cryptographic Toolkit."
-            print "Get it from http://www.dlitz.net/software/pycrypto/. or"
+        prnt (_("\002\0034No Blowfish implementation"))
+        if not IS_WINDOWS:
+            prnt (_("This module requires PyCrypto / The Python Cryptographic Toolkit."))
+            prnt (_("Get it from http://www.dlitz.net/software/pycrypto/. or"))
         else:
-            path = path.replace(sep,sep*2)
-        print "Download Python only Blowfish at %s" % PYBLOWFISHURL
-        print "or type \002/FISHSETUP\002 for automatic install of that"
-
-        REQUIRESETUP = True
+            path = path.replace(os.sep,os.sep*2)
+        prnt (_("Download Python only Blowfish at %s") % PYBLOWFISHURL)
+        prnt (_("or type \002/FISHSETUP\002 for automatic install of that"))
 
 try:
     from Crypto.Util.strxor import strxor as xorstring
 except ImportError:
     ## use slower python only xor
+    debug ("python_only xorstring is used")
     def xorstring(a, b): # Slow.
         """xor string a and b, both of length blocksize."""
         xored = []
@@ -276,441 +100,835 @@ except ImportError:
             xored.append( chr(ord(a[i]) ^ ord(b[i])) )
         return "".join(xored)
 
-if not isWindows:
-    from threading import Thread
-else:
-    class Thread:
-        def __init__(self,target=None,args=[],kwargs={},name='Thread*'):
-            self.__target = target
-            self.__args = args
-            self.__kwargs = kwargs
-            self.__name = name
-            self.__hook = None
-        def start(self):
-            print "-Starting Pseudo Thread"
-            self.__hook = xchat.hook_timer(1,self.__thread,(self.__target,self.__args,self.__kwargs))
-        def __thread(self,userdata):
-            try:
-                _thread,args,kwargs = userdata
-                _thread(*args,**kwargs)
-            finally:
-                xchat.unhook(self.__hook)
-                self.__hook = None
-                return False
+def script_info():
+    import inspect
+    _script = inspect.currentframe().f_code.co_filename
+    try:
+        _script = os.readlink(_script)
+    except (AttributeError,OSError):
+        ## windows has no symlinks/ or _script is no symlink
+        pass
+    _path = os.sep.join(_script.split(os.sep)[:-1])
+    ## append current path
+    sys.path.insert(0,_path)
 
-import socket
-REALSOCKET = socket.socket
+    return {
+        'filename'  : "".join(_script.split(os.sep)[-1:]),
+        'path'      : _path,
+        'sha1'      : hashlib.sha1(open(_script,'rb').read()).hexdigest(),
+    }
 
-def makedict(**kwargs):
-    return kwargs
+SCRIPT = script_info()
 
-COLOR = makedict(white="\0030", black="\0031", blue="\0032", red="\0034",
-    dred="\0035", purple="\0036", dyellow="\0037", yellow="\0038", bgreen="\0039",
-    dgreen="\00310", green="\00311", bpurple="\00313", dgrey="\00314",
-    lgrey="\00315", close="\003")
-
-
-class SecretKey(object):
-    def __init__(self, dh, key=None,protectmode=False,cbcmode=False):
-        self.dh = dh
-        self.key = key
-        self.cbc_mode = cbcmode
-        self.protect_mode = protectmode
-        self.active = True
-        self.cipher = 0
-        self.keyname = (None,None)
-    def __str__(self):
-        return "%s@%s" % self.keyname
-    def __repr__(self):
-	return "%s" % (self.key)
-
-
-def proxyload(_thread,_useproxy,doExtra):
-    socket.socket = REALSOCKET
-    if xchat.get_prefs('net_proxy_type') > 0 and _useproxy:
-        try:
-            import socks
-        except ImportError:
-            print "\0034python-socksipy not installed"
-            print "sudo apt-get install python-socksipy"
-            print "or install %s" % SOCKSIPYURL
-            print "or just use the noproxy option with /FISHUPDATE and /FISHSETUP"
-            return xchat.EAT_ALL
-
-        proxytype = [0,-1,socks.PROXY_TYPE_SOCKS4,socks.PROXY_TYPE_SOCKS5,socks.PROXY_TYPE_HTTP,-1][xchat.get_prefs('net_proxy_type')]
-        nameproxytype = ['','Socks4a','Socks5','HTTP','']
-        if proxytype < 0:
-            print "\0034Proxytype not suported for updates"
-            return xchat.EAT_ALL
-        proxyuser = xchat.get_prefs('net_proxy_user')
-        proxypass = xchat.get_prefs('net_proxy_pass')
-        if len(proxyuser) < 1 or len(proxypass) < 1:
-            proyxuser = proxypass = None
-        socks.setdefaultproxy(proxytype,xchat.get_prefs('net_proxy_host'),xchat.get_prefs('net_proxy_port'),rdns=True,username=proxyuser,password=proxypass)
-        print "\00310using xchat proxy settings \0037Type: %s Host: %s Port: %s" % (nameproxytype[proxytype],xchat.get_prefs('net_proxy_host'),xchat.get_prefs('net_proxy_port'))
-        
-        ## Replace default socket
-        socket.socket = socks.socksocket
-                    
-    import urllib2
-    _thread(urllib2,doExtra)
-
-def destroyObject(userdata):
-    global loadObj
-    del loadObj
-    return False
-
-class XChatCrypt:
+class shared_crypto_storage(object):
     def __init__(self):
-        print "%sFishcrypt Version %s %s\003" % (COLOR['blue'],__module_version__,ISBETA)
-        print "SHA1 checksum: %r" % SCRIPTCHKSUM
-        self.active = True
-        self.__KeyMap = {}
-        self.__TargetMap = {}
-        self.__lockMAP = {}
-        self.config = {
-            'PLAINTEXTMARKER' : '+p',
-            'DEFAULTCBC' : True,
-            'DEFAULTPROTECT' : False,
-            'FISHUPDATETIMEOUT' : 30,
-            'MAXMESSAGELENGTH' : 300,
-            'USEPROXYUPDATE' : True,
-            'FISHBETAVERSION': True,
-            'FISHDEVELOPDEBUG': False,
-            'AUTOBACKUP': True,
-            'FISHSTEALTH': False,
+        self.db_status = None
+        self.db_file = os.path.join(SCRIPT['path'],'storage.crypto')
+        self.db_key = None
+        self.db_need_key = False
+        self.db_cipher = 'CBC_BLOWFISH'
+        self.db_iscrypted = False
+        self.cipher_functions = {
+            'CBC_BLOWFISH':BlowfishCBC,
         }
-        self.status = {
-            'CHKPW': None,
-            'DBPASSWD' : None,
-            'CRYPTDB' : False,
-            'LOADED' : True
+        self.db = {
+            'networks': {},
+            'configs': {},
         }
-        self.__update_thread = None
-        self._updatedSource = None
-        self.__hooks = []
-        self.__hooks.append(xchat.hook_command('SETKEY', self.set_key, help='set a new key for a nick or channel /SETKEY <nick>/#chan [new_key]'))
-        self.__hooks.append(xchat.hook_command('KEYX', self.key_exchange, help='exchange a new pub key, /KEYX <nick>'))
-        self.__hooks.append(xchat.hook_command('KEY', self.show_key, help='list key of a nick or channel or all (*), /KEY [nick/#chan/*]' ))
-        self.__hooks.append(xchat.hook_command('DELKEY', self.del_key, help='remove key, /DELKEY <nick>/#chan/*'))
-        self.__hooks.append(xchat.hook_command('CBCMODE', self.set_cbc, help='set or shows cbc mode for (current) channel/nick , /CBCMODE [<nick>] <0|1>'))
-        self.__hooks.append(xchat.hook_command('PROTECTKEY', self.set_protect, help='sets or shows key protection mode for (current) nick, /PROTECTKEY [<nick>] <0|1>'))
-        self.__hooks.append(xchat.hook_command('ENCRYPT', self.set_act, help='set or shows encryption on for (current) channel/nick , /ENCRYPT [<nick>] <0|1>'))
+        self.load_db()
+    def load_db(self):
+        try:
+            _hnd = open(self.db_file,'rb')
+            _data = _hnd.read()
+            self.db_time = os.path.getmtime(self.db_file)
+            _hnd.close()
+            _data = self.decrypt_data(_data)
+            if _data:
+                self.db = json.loads(_data)
+                #keep a local copy of inital loaded db
+                self._db = copy.deepcopy(self.db)
+                ##TODO: send db hash to clients
+                debug("DB:loaded %r" % self.db)
+                self.db_defaults()
+        except IOError,e:
+            if e.errno not in [errno.ENOENT]:
+                prnt(e)
+            debug ("Create file %r" % self.db_file)
+            self.save_db()
+
+    def db_defaults(self):
+        if not self.db.get('networks'):
+            self.db['networks'] = {}
+        if not self.db.get('configs'):
+            self.db['configs'] = {}
+
+    def save_db(self):
+        debug("saving Database")
+        _data = json.dumps(self.db)
+        _data = self.encrypt_data(_data)
+        try:
+            _hnd = open(self.db_file,'wb')
+            _hnd.write(_data)
+            _hnd.close()
+            ##TODO: send db hash to clients
+        except IOError,e:
+            if e.errno not in [errno.ENOENT]:
+                prnt(e)
+
+    def get_cipher_class(self,cipher=None):
+        if not cipher:
+            cipher = self.cipher
         
-        self.__hooks.append(xchat.hook_command('PRNCRYPT', self.prn_crypt, help='print msg encrpyted localy , /PRNCRYPT <msg>'))
-        self.__hooks.append(xchat.hook_command('PRNDECRYPT', self.prn_decrypt, help='print msg decrpyted localy , /PRNDECRYPT <msg>'))
+        _class = self.cipher_functions.get(cipher,lambda x: None)(self.db_key)
+        if _class:
+            self.cipher = cipher
+        return _class
 
-        self.__hooks.append(xchat.hook_command('UPDATE', self.update, help='Update this Script'))
-        self.__hooks.append(xchat.hook_command('FISHUPDATE', self.fishupdate, help='Update this Script'))
+    def encrypt_data(self,data):
+        if self.db_key:
+            _cipher = get_cipher_class()
+            if _cipher:
+                data = "%s*** %s" % (self.cipher,_cipher.encrypt(data))
+        return data
 
-        ## check for password sets
-        self.__hooks.append(xchat.hook_command('SET',self.settings))
-        self.__hooks.append(xchat.hook_command('DBPASS',self.set_dbpass))
-        self.__hooks.append(xchat.hook_command('DBLOAD',self.set_dbload))
+    def decrypt_data(self,data):
+        _pos = data[:20].find("***")
+        if _pos > 1:
+            cipher = data[:_pos]
+            if not self.db_key:
+                debug("DB is crypted(%s) and no no key set" % cipher)
+                self.db_need_key = True
+                return None
+            _cipher = get_cipher_class(cipher)
+            if not _cipher:
+                prnt("Cipher %r not supported DB not loaded")
+                return None
+            self.db_iscrypted = True
+            data = _cipher.decrypt(data[_pos:])
+            debug("decrypt_data: Encrypted Storage found with Cipher %r" % cipher)
+        return data
+        
+        
+    def get_network_db(self,network):
+        g_netdb = self.db.get('networks')
+        netdb = g_netdb.get(network)
+        if not netdb:
+            netdb = self.make_network_config(network)
+            g_netdb[network] = netdb
+        else:
+            use_other_db = netdb.get("useotherdb")
+            if use_other_db:
+                other_db = self.get_network_db(use_other_db)
+                if other_db:
+                    debug ("get_network_db: using other db: %r" % other_db['network'])
+                    netdb = other_db
+        debug("get_network_db:",netdb)
+        return netdb.get('db')
 
-        self.__hooks.append(xchat.hook_command('HELP',self.get_help))
+    def make_network_config(self,network):
+        return {"network":network,"useotherdb": None, 'db' : {} }
 
-        self.__hooks.append(xchat.hook_command('', self.outMessage))
-        self.__hooks.append(xchat.hook_command('ME+', self.outMessageCmd))
-        self.__hooks.append(xchat.hook_command('MSG', self.outMessageCmd))
-        self.__hooks.append(xchat.hook_command('MSG+', self.outMessageForce))
-        self.__hooks.append(xchat.hook_command('NOTICE', self.outMessageCmd))
-        self.__hooks.append(xchat.hook_command('NOTICE+', self.outMessageForce))
+    def get_config(self,script,default_config = {}):
+        _loaded_config = self.db['configs'].get(script,{})
 
-        self.__hooks.append(xchat.hook_server('notice', self.on_notice,priority=xchat.PRI_HIGHEST))
-        self.__hooks.append(xchat.hook_server('332', self.server_332_topic,priority=xchat.PRI_HIGHEST))
+        #only load valid configs
+        for key,value in default_config.iteritems():
+            default_config[key] = _loaded_config.get(key,value)
+        self.db['configs'][script] = default_config
+        return default_config
 
-        self.__hooks.append(xchat.hook_print('Key Press',self.tabComplete))
+    ## search dict key on keyword with method (startswith or endswith)
+    def _search_dict(self,keyword,s_dict,method):
+        _ret = {}
+        for _key,_val in s_dict.iteritems():
+            if method(_key,keyword):
+                _ret[_key] = _val
+        return _ret
 
-        self.__hooks.append(xchat.hook_print('Notice Send',self.on_notice_send, 'Notice',priority=xchat.PRI_HIGHEST))
-        self.__hooks.append(xchat.hook_print('Change Nick', self.nick_trace))
-        self.__hooks.append(xchat.hook_print('Channel Action', self.inMessage, 'Channel Action',priority=xchat.PRI_HIGHEST))
-        self.__hooks.append(xchat.hook_print('Private Action to Dialog', self.inMessage, 'Private Action to Dialog',priority=xchat.PRI_HIGHEST))
-        self.__hooks.append(xchat.hook_print('Private Action ', self.inMessage, 'Private Action',priority=xchat.PRI_HIGHEST))
-        self.__hooks.append(xchat.hook_print('Channel Message', self.inMessage, 'Channel Message',priority=xchat.PRI_HIGHEST))
-        self.__hooks.append(xchat.hook_print('Private Message to Dialog', self.inMessage, 'Private Message to Dialog',priority=xchat.PRI_HIGHEST))
-        self.__hooks.append(xchat.hook_print('Private Message', self.inMessage, 'Private Message',priority=xchat.PRI_HIGHEST))
-        self.__hooks.append(xchat.hook_unload(self.__destroy))
-        self.loadDB()
+    ## search dict for search pattern
+    def search_dict(self,s_pattern,s_dict):
+        debug("search_dict: %r %r" % (s_pattern,s_dict))
+        if s_pattern.find("*") == -1:
+            ## no wildcard so match direct
+            return s_dict.get(s_pattern) and [s_pattern] or []
 
-    def __destroy(self,userdata):
-        for hook in self.__hooks:
-            xchat.unhook(hook)
-        destroyObject(None)
+        _method = str.startswith
+        _ret = s_dict
+        for keyword in s_pattern.split("*"):
+            if keyword:
+                _ret = self._search_dict(keyword,_ret,_method)
+            if _method == str.endswith:
+                break
+            _method = str.endswith
+        debug("search_dict: pattern: %r returns %r" % (s_pattern,_ret.keys()))
+        return _ret.keys()
+
+class KeySizeError(Exception):
+    pass
+
+class CryptEnforceError(Exception):
+    pass
+
+class CryptoError(Exception):
+    pass
+
+class UserNotFoundError(Exception):
+    pass
+
+class client_message(object):
+    def __init__(self,message,to_network=None,prefix=''):
+        self.message = message
+        self.to_network = to_network
+        self.prefix = prefix
+        self.error = None
+    def __str__(self):
+        return self.message
+    def __repr__(self):
+        return "<message: %r to_network; %r prefix: %r error: %r>" % (self.message,self.to_network,self.prefix,self.error)
+
+class key_manager(object):
+    def __init__(self):
+        self.storage = shared_crypto_storage()
+
+        debug("Create key_manager")
+        self.config = self.storage.get_config('fishcrypt', {
+            'plaintextmarker' : '+p',
+            'MAXMESSAGELENGTH' : 300,
+            'FISHDEVELOPDEBUG': False,
+            'stealth_mode': False,
+            'default_protected' : 0,
+            'default_cipher' : 'CBC_BLOWFISH',
+            'default_req-cipher': 0,
+            }
+        )
+        ## TODO: defaults und einstellungene je netzwerk
+
+        self.dh_manager = dh1080_manager()
+
+        ## msg_prefix prefix: (function,NAME,priority)
+        self.ciphers = {
+            "CBC_BLOWFISH"  : (self.blowfish_cbc_encrypt,self.blowfish_cbc_decrypt, 5),
+            "ECB_BLOWFISH"  : (self.blowfish_ecb_encrypt,self.blowfish_ecb_decrypt, 2),
+            "DH1080INIT"    : (None,self.dh1080_init,-1),
+            "DH1080FINISH"  : (None,self.dh1080_finish,-1),
+        }
+        self.msg_prefix = {
+            "+OK *"           :"CBC_BLOWFISH",
+            "mcps *"          :"CBC_BLOWFISH",
+            "+OK "            :"ECB_BLOWFISH",
+            "mcps "           :"ECB_BLOWFISH",
+            "DH1080_INIT "    :"DH1080INIT",
+            "DH1080_FINISH "  :"DH1080FINISH",
+        }
 
     def __del__(self):
-        print "\00311fishcrypt.py successful unloaded"
+        prnt("Destroying Keymanager")
 
-    def get_help(self,word, word_eol, userdata):
+    def get_user(self,target,network,create=False,**kwargs):
+        _db = self.storage.get_network_db(network)
+        _user = _db.get(target)
+        if not _user and create:
+            debug("get_user: Creating user %s (%s)" % (target,network))
+            _user = self.add_user(target,network,**kwargs)
+        return _user
+
+
+    def show_user(self,target,network):
+        message_format = _("| %-20s | %-50s | %-3s | %-3s | %-15s |")
+        _user = None
+        _printed_lines = 0
+        _printed_network = []
+        _found_networks = self.storage.search_dict(network,self.storage.db.get('networks'))
+        TIMETOTEXT = lambda x: time.strftime(_("%d.%m.%Y %H:%M"),time.localtime(x))
+        for _network in _found_networks:
+            _netdb = self.storage.get_network_db(_network)
+            _found_users = self.storage.search_dict(target, _netdb)
+            if len(_found_networks) == 1 and len(_found_users) == 1:
+                ### details for single user
+                _username = _found_users[0]
+                _user = _netdb.get(_username)
+
+                prnt(_("User: %-20s on %-25s added: %s") % (_username,_network,TIMETOTEXT(_user.get('date-add') )))
+                _key = _user.get('key')
+                if _key:
+                    prnt(_("Key: %-50s set on %-20s") % (_key,TIMETOTEXT(_user.get('date-key'))))
+                    prnt(_("Encryption activated: %s  Protected: %s  Cipher: %s") % 
+                        (
+                        YESNO(_user.get('encryption')),
+                        YESNO( self.get_user_setting(_user,'protected')),
+                        self.get_user_setting(_user,'cipher')
+                        )
+                    )
+                return 
+            for _username in _found_users:
+                if _printed_lines % 20 == 0:
+                    prnt(("\002%s\002" % message_format) % ("Username","Key","ENC","PRO","Cipher"))
+                _printed_lines +=1
+
+                if _network not in _printed_network:
+                    prnt("-------- [ %s ] %s" % (_network,"-"*(80-len(_network))))
+                    _printed_network.append(_network)
+
+                _user = _netdb.get(_username)
+                prnt( message_format  % 
+                    (
+                    _user.get('user'),
+                    _user.get('key'),
+                    YESNO(_user.get('encryption')),
+                    YESNO( self.get_user_setting(_user,'protected')),
+                    self.get_user_setting(_user,'cipher')
+                    )
+                )
+        if not _user:
+            prnt(_("User %s (%s) not found in DB") % (target,network))
+            return 
+
+    def add_user(self,target,network,cipher=-1,priority=-1,pubkey=None,protected=-1,encryption=-1,**kwargs):
+        _db = self.storage.get_network_db(network)
+        now = int(time.time())
+        ## FIXME: wofür noch priority?
+        if priority < 0:
+            ## keyexchange cipher 
+            #cipher = self.config['default_cipher']
+            #protected = self.config['default_protected']
+            encryption = 1
+
+        _db[target] = {
+            "uuid"      : uuid.uuid4().hex,
+            "user"      : target,
+            "key"       : None,
+            "cipher"    : cipher,
+            "sessionkey": None,
+            "date-add"  : now,
+            "date-seen" : now,
+            "seen-as"   : target,
+            "pub-key"   : pubkey,
+            "encryption": encryption,
+        }
+#            "protected" : protected,
+#            "req-cipher": -1,
+        self.storage.save_db()
+        debug("add_user: %r",_db)
+        return _db[target]
+
+    def del_user(self,target,network):
+        pass
+
+    def get_user_setting(self,_user,setting_name):
+        val = _user.get(setting_name,-1)
+        if val == -1:
+            val = self.config.get("default_%s" % setting_name,-1)
+            if val == -1:
+                raise ValueError("setting %r has no default" % setting_name)
+        return val
+
+    def set_user_setting(self,_user,create=False,save=True,**kwargs):
+        if not _user:
+            raise UserNotFoundError
+        for keyword,value in kwargs.iteritems():
+            if keyword == "key":
+                _user['date-key'] = int(time.time())
+            _user[keyword] = value
+        if save:
+            self.storage.save_db()
+        return True
+
+    def set_key(self,key,target,network):
+        if len(key) < 8 or len(key) > 56:
+            raise KeySizeError(_("Key must be between 8 and 56 chars"))
+        _user = self.get_user(target,network,create=True)
+        self.set_user_setting(_user,key=key,encryption=1)
+        debug("set_key:",**_user)
+
+    def decrypt(self,message,target,network):
+        debug("key_manager.decrypt: %r" % dict(message=message,target=target,network=network))
+        ret = None
+        for prefix in self.msg_prefix.keys():
+            if message.startswith(prefix):
+                cipher = self.msg_prefix[prefix]
+                encrypt_func,decrypt_func,priority = self.ciphers.get(cipher)
+                _user = self.get_user(target,network,priority=priority,cipher=cipher,create=True)
+
+                try:
+                    ret = decrypt_func(_user,message[len(prefix):],target,network)
+                    debug("key_manager.decrypt: %r" % dict(cipher=cipher,priority=priority,ret=ret))
+                except CryptoError,e:
+                    prnt(e)
+                    return client_message("\003%s" % message,prefix="?")
+                ##TODO catch all unknown exceptions and write traceback to debug channel
+                break
+
+        return ret
+
+    def encrypt(self,message,target,network,enforce=False):
+        debug ("key_manager.encrypt: %r" % dict(enforce=enforce,target=target,network=network,message=message))
+        if message.startswith(self.config['plaintextmarker']):
+            message = message[len(self.config['plaintextmarker']):].lstrip()
+            return (client_message(message,to_network=message))
+
+        _user = self.get_user(target,network)
+        if not _user:
+            return None
+
+        if not _user.get('key'):
+            if (enforce or self.get_user_setting(_user,"req-cipher") > 0):
+                raise CryptEnforceError(_("Encryption enforced: message not sent"))
+            return None
+
+        if not _user.get("encryption") and not enforce:
+            debug("why im leaving here")
+            return None
+        encrypt_func,decrypt_func,priority = self.ciphers.get(self.get_user_setting(_user,"cipher"))
+        try:
+            return_message = encrypt_func(_user, message,target,network)
+        except CryptoError,e:
+            prnt(e)
+        ##TODO catch all unknown exceptions and write traceback to debug channel
+        debug("encrypt:%r" % return_message)
+        return return_message
+
+    ## mirccryption container
+    def mirc_cryption_pack(self,data,prefix):
+        return "%s%s" % (prefix,data.encode("base64"))
+
+    def mirc_cryption_unpack(self,data):
+        data = self.fix_b64_padding(data)
+        try:
+            return data.decode("base64")
+        except binascii.Error:
+            return ""
+
+    ## blowcrypt container
+    def blowcrypt_pack(self,data,prefix):
+        return "%s%s" % (prefix,blowcrypt_b64encode(data))
+
+    def blowcrypt_unpack(self,data):
+        data = self.fix_b64_padding(data)
+        return blowcrypt_b64decode(data)
+
+    ## try to fix base64 padding
+    def fix_b64_padding(self,data):
+        pad_err = len(data) % 4
+        if pad_err:
+            debug("fix_b64_padding %r (%r)" % (data,pad_err))
+            if pad_err > 2:
+                data = "%s%s" % (data,"=" *(4-pad_err))
+            else:
+                data = data[:-pad_err]
+        return data
+
+    def blowfish_cbc_encrypt(self,user,message,target,network):
+        key = user.get('key')
+        if not key:
+            return None
+
+        return client_message(message,to_network=self.mirc_cryption_pack(
+                BlowfishCBC(key).encrypt(message),"+OK *"
+            ),prefix="°°"
+        )
+
+    def blowfish_cbc_decrypt(self,user,message,target,network):
+        key = user.get('key')
+        if not key:
+            return None
+
+        return client_message(
+            BlowfishCBC(key).decrypt(
+                self.mirc_cryption_unpack(message)
+            ),prefix="°°"
+        )
+
+    def blowfish_ecb_encrypt(self,user,message,target,network):
+        key = user.get('key')
+        if not key:
+            return None
+
+        return client_message(message,to_network=self.blowcrypt_pack(
+                Blowfish(key).encrypt(message),"+OK "
+            ),prefix="°"
+        )
+
+    def blowfish_ecb_decrypt(self,user,message,target,network):
+        key = user.get('key')
+        if not key:
+            return None
+
+        return client_message(
+            Blowfish(key).decrypt(
+                self.blowcrypt_unpack(message)
+            ),prefix="°"
+        )
+
+    def dh1080_init(self,user,message,target,network):
+        debug("dh1080_init: %s(%s) %r" % (target,network,message))
+
+        ## dont add default values until we check for stealth mode
+        #_user = self.get_user(target,network,priority=0,create=True)
+        
+        ## create keypair
+        token = self.dh_manager.gen_keypair(user.get('uuid'))
+        ## store the remote partys public key
+        self.dh_manager.set_remote_pub_key(user.get('uuid'),self.dh_manager.unpack(message))
+        to_network = None
+
+        _additional_info = ""
+        ## TODO: mirc CBC detection ... word[5]
+        if not self.config.get("stealth_mode"):
+            _send_status = ""
+            #self.set_user_setting(_user,encrytion=1)
+            _key = self.dh_manager.get_secret(user.get('uuid'))
+            self.set_user_setting(user,key=_key,encryption=1)
+            debug("dh1080_init: key set to %r" % user['key'])
+            to_network = self.dh_manager.pack("DH1080_FINISH",token)
+            debug("dh1080_init: send %r" % to_network)
+            ## destroy the token object
+            self.dh_manager.destroy(user.get('uuid'))
+            if not self.get_user_setting(user,"protected"):
+                to_network = _("User has key protection activated, exchange blocked - waiting for aproval")
+                _send_status = "(PROTECTED) "
+
+        else:
+            _send_status = "(STEALTH) "
+        if _send_status:
+            _additional_info = _(" accept with /KEYX %s " % target)
+
+        return client_message(_("%sDH1080 Keyexchange received from %s (%s)%s") % 
+            (_send_status,target,network,_additional_info),
+            to_network=to_network
+        )
+    def dh1080_finish(self,user,message,target,network):
+        debug("dh1080_finish: %s(%s) %r" % (target,network,message))
+        #_user = self.get_user(target,network)
+        #if not user:
+        #    return client_message(_("DH1080_FINISH received but not requested, ignoring"))
+        token = self.dh_manager.db.get(user.get('uuid'))
+
+        if not token:
+            return client_message(_("DH1080_FINISH received but not requested, ignoring"))
+        self.dh_manager.set_remote_pub_key(user.get('uuid'),self.dh_manager.unpack(message))
+       
+        _key = self.dh_manager.get_secret(user.get('uuid'))
+        if not _key:
+            _message = _("DH1080 exchange Token expired")
+            return client_message(None,to_network=_message)
+        self.set_user_setting(user,key=_key)
+        debug("dh1080_finish: key set to %r" % user['key'])
+        
+        ## destroy the token object
+        self.dh_manager.destroy(user.get('uuid'))
+        
+        return client_message(_("DH1080 Keyexchange with %s (%s) finished") % (target,network),to_network=None)
+
+    def dh1080_start(self,user,target,network):
+        debug("dh1080_start: %s(%s) %r" % (target,network,user))
+        token = self.dh_manager.db.get(user.get('uuid'))
+        ## check if there is allready a valid token
+        if token:
+            try:
+                _key = self.dh_manager.get_secret(user.get('uuid'))
+            except AssertionError:
+                return client_message(_("DH1080 Keyexchange with %s still outstanding") % target)
+            if _key:
+                self.set_user_setting(user,key=_key,encryption=1)
+                debug("dh1080_start: previously rejected key set to %r" % user['key'])
+                to_network = self.dh_manager.pack("DH1080_FINISH",token)
+                ## destroy the token object
+                self.dh_manager.destroy(user.get('uuid'))
+                return client_message(_("DH1080 Keyexchange with %s accepted") % target,to_network=to_network)
+
+        token = self.dh_manager.gen_keypair(user.get('uuid'))
+        to_network=self.dh_manager.pack("DH1080_INIT",token)
+        return client_message(_("DH1080 Keyexchange with %s initiated") % target,to_network=to_network)
+
+    def key_exchange(self,target,network):
+        _user = self.get_user(target,network,priority=-1,create=True)
+        return self.dh1080_start(_user,target,network)
+
+
+class irc_client_interface(object):
+    ## debugging
+    def evaldebug(self,word, word_eol, userdata):
+        eval(compile(word_eol[1],'develeval','exec'))
+        return xchat.EAT_ALL
+    ## return the nick from a full usermask
+    def get_nick(self,full):
+        full = full.lstrip(":")
+        identpos = full.find('!')
+        if identpos > -1:
+            return full[:identpos]
+        return full
+
+
+
+### XCHAT/Hexchat ###
+class xchat_client_interface(irc_client_interface):
+    def __init__(self):
+        prnt (_("\0032Fishcrypt Version %s\003") % ("%s %s" % (__module_version__,ISBETA)))
+        prnt ("SHA1 checksum: %r" % SCRIPT['sha1'])
+        self.interface_type = "xchat"
+
+        self.__context_lock_map = {}
+        
+        self.key_manager = key_manager()
+
+        self.helpmessages = {
+            "MSG+"          : (1, "<channel|nick> <message>",    _("send crypted msg regardless of /ENCRYPT setting")),
+            "ME+"           : (2, "<message>",                   _("send crypted CTCP ACTION")),
+            "NOTICE+"       : (3, "<channel|nick> <message>",    _("send crypted notice regardless of /ENCRYPT setting")),
+            "PRNDECRYPT"    : (4, "<cryptedmessage>",            _("decrypts messages localy")),
+            "PRNCRYPT"      : (5, "<messages>",                  _("encrypts messages localy")),
+            "KEYX"          : (6, "[<nick>]",                    _("make a Key exchange")),
+            "SETKEY"        : (7, "[<channel|nick>] <key>",      _("set a new key for (current) nick or channel")),
+            "KEY"           : (8, "[<channel|nick|*>]",          _("show keys matching context/nick/or wildcard")),
+            "DELKEY"        : (9, "[<channel|nick>|*]",          _("delete the key for channel/nick/wildcard")),
+            "CBCMODE"       : (10,"[<channel|nick>] <0/1>",      _("enable/disable CBC Mode for nick/channel")),
+            "PROTECTKEY"    : (11,"[<channel|nick>] <0/1>",      _("enable/disable protection for nick/channel")),
+            "ENCRYPT"       : (12,"[<channel|nick>] <0/1>",      _("enable/disable encryption for nick/channel")),
+            "DBPASS"        : (13,"", _("set/change the passphrase for the Key Storage")),
+            "DBLOAD"        : (14,"", _("loads the Key Storage")),
+            "SET"           : (15,"", _("show/set fishcrypt settings")),
+        }
+        self.xchat_hooks = []
+        ## Commands
+        self.hook('HELP',                       self.cmd_help)
+
+        self.hook('',                           self.cmd_msg)
+        self.hook('MSG',                        self.cmd_msg)
+        self.hook('MSG+',                       self.cmd_msg)
+        self.hook('ME+',                        self.cmd_msg)
+        self.hook('NOTICE',                     self.cmd_msg)
+        self.hook('NOTICE+',                    self.cmd_msg)
+        self.hook('PRNCRYPT',                   self.cmd_prncrypt,)
+        self.hook('PRNDECRYPT',                 self.cmd_prndecrypt)
+
+        self.hook('KEYX',                       self.cmd_keyx)
+        self.hook('SETKEY',                     self.cmd_setkey)
+        self.hook('KEY',                        self.cmd_key)
+        self.hook('DELKEY',                     self.cmd_delkey)
+        self.hook('CBCMODE',                    self.cmd_cbcmode)
+        self.hook('PROTECTKEY',                 self.cmd_protectkey)
+        self.hook('ENCRYPT',                    self.cmd_encrypt)
+       
+        self.hook('CRYPT',                      self.cmd_set)
+        self.hook('DBPASS',                     self.cmd_dbpass)
+        self.hook('DBLOAD',                     self.cmd_dbload)
+
+
+        self.hook('FISHEVAL',                   self.evaldebug)
+
+        ## Server Messages
+        self.hook('332',                        self.server_topic,   hooktype='server', priority=xchat.PRI_HIGH)
+        self.hook('topic',                      self.server_topic,   hooktype='server', priority=xchat.PRI_HIGH)
+        self.hook('notice',                     self.server_notice,  hooktype='server', priority=xchat.PRI_HIGH, userdata='Notice')
+
+        ## Xchat Messages
+        self.hook('Notice Send',                self.print_notice,   hooktype='print', priority=xchat.PRI_HIGH)
+        
+        self.hook('Channel Action',             self.print_msg,      hooktype='print', priority=xchat.PRI_HIGH)
+        self.hook('Private Action to Dialog',   self.print_msg,      hooktype='print', priority=xchat.PRI_HIGH)
+        self.hook('Private Action ',            self.print_msg,      hooktype='print', priority=xchat.PRI_HIGH)
+        self.hook('Channel Message',            self.print_msg,      hooktype='print', priority=xchat.PRI_HIGH)
+        self.hook('Private Message to Dialog',  self.print_msg,      hooktype='print', priority=xchat.PRI_HIGH)
+        self.hook('Private Message',            self.print_msg,      hooktype='print', priority=xchat.PRI_HIGH)
+
+        self.hook('Process Already Running',    self.plugin_msg,     hooktype='print', priority=xchat.PRI_HIGHEST)
+
+        self.hook('Key Press',                  self.print_keypress, hooktype='print')
+        self.hook('Change Nick',                self.print_nick,     hooktype='print')
+    ## add hooks
+    def hook(self,what,func,hooktype='command',**kwarg):
+        ## get hook function
+        _hook = getattr(xchat,"hook_%s" % hooktype,None)
+
+        if not _hook:
+            return
+
+        if not kwarg.get('userdata'):
+            kwarg['userdata'] = what
+        helpmsg = self.helpmessages.get(what)
+        if helpmsg and what != "SET":
+            kwarg['help'] = _("usage: %s %s %s") % (what,helpmsg[1],helpmsg[2])
+        if not self.xchat_hooks:
+            self.xchat_hooks.append(('unloadhook',xchat.hook_unload(self.unload_interface)))
+
+        self.xchat_hooks.append(('%s_%s' % (hooktype,what),_hook(what,func,**kwarg)))
+
+    ## unload Interface and unhook all functions
+    def unload_interface(self,userdata):
+        del self.key_manager 
+        for desc,hook in self.xchat_hooks:
+            #debug ("unhooking %r %r" % (desc,hook))
+            xchat.unhook(hook)
+        destroy_client_interface()
+
+    ## destructor
+    def __del__(self):
+        xchat.prnt (_("\00311fishcrypt.py successful unloaded"))
+
+    def usage(self,command):
+        help = self.helpmessages.get(command,None)
+        if not help:
+            prnt( _("No help available for %r" % command))
+        prnt (_("usage: %s %s %s") % (command,help[1],help[2]))
+
+    ## show help
+    def cmd_help(self,word, word_eol, userdata):
         if len(word) < 2:
-            print "\n\0033 For fishcrypt.py help type /HELP FISHCRYPT"
+            print _("\n\0033 For fishcrypt.py help type /HELP FISHCRYPT")
             return xchat.EAT_NONE
         if word[1].upper() == "FISHCRYPT":
             print ""
             print "\002\0032 ****  fishcrypt.py Version: %s %s ****" % (__module_version__,ISBETA)
-            if self.config['FISHBETAVERSION']:
-                print "\0036Beta download %s" % (BETAUPDATEURL)
-            
             print "\0036 %s" % UPDATEURL
             print "\n"
-            print " \002\00314***************** Fishcrypt Help ********************"
+            print _(" \002\00314***************** Fishcrypt Help ********************")
             print " -----------------------------------------------------"
-            print "/MSG+ \00314send crypted msg regardless of /ENCRYPT setting"
-            print "/NOTICE+ \00314send crypted notice regardless of /ENCRYPT setting"
-            print "/ME+ \00314send crypted CTCP ACTION"
-            print "/SETKEY \00314set a new key for a nick or channel"
-            print "/KEYX \00314exchange pubkey for dialog"
-            print "/KEY \00314show Keys"
-            print "/DELKEY \00314delete Keys"
-            print "/CBCMODE \00314enable/disable CBC Mode for this Key"
-            print "/ENCRYPT \00314enable/disable encryption for this Key"
-            print "/PROTECTKEY \00314enable/disable protection for keyx key exchange"
-            print "/DBPASS \00314set/change the passphrase for the Key Storage"
-            print "/DBLOAD \00314loads the Key Storage"
-            print "/PRNDECRYPT \00314decrypts messages localy"
-            print "/PRNCRYPT \00314encrypts messages localy"
-            print "/FISHUPDATE \00314check online for new Version and update"
-            print "/SET [fishcrypt] \00314show/set fishcrypt settings"
+            for command,helpitem in sorted(self.helpmessages.items(),key=lambda (k,v): (v,k)):
+                print "/%-12s: \00314%-25s\003 %s" % (command,helpitem[1],helpitem[2])
             return xchat.EAT_ALL
 
-    def tabComplete(self,word, word_eol, userdata):
-        if word[0] not in ["65289","65056"]:
-            return xchat.EAT_NONE
-        input = xchat.get_info('inputbox')
-        if input.upper().startswith("/UPDATE FISHCRYPT I"):
-            newinput = "/UPDATE FISHCRYPT INSTALL"
-        elif input.upper().startswith("/UPDATE FISHCRYPT D"):
-            newinput = "/UPDATE FISHCRYPT DIFF"
-        elif input.upper().startswith("/UPDATE FISHCRYPT C"):
-            newinput = "/UPDATE FISHCRYPT CHANGES"
-        elif input.upper().startswith("/UPDATE FISHCRYPT L"):
-            newinput = "/UPDATE FISHCRYPT LOAD"
-        elif input.upper() == "/UPDATE FISHCRYPT ":
-            print "LOAD INSTALL DIFF CHANGES"
-            return xchat.EAT_NONE
-        elif input.upper().startswith("/UPDATE F"):
-            newinput = "/UPDATE FISHCRYPT "
-        elif input.upper().startswith("/HELP F"):
-            newinput = "/HELP FISHCRYPT "
-        elif input.upper().startswith("/SET F"):
-            newinput = "/SET FISHCRYPT "
-        else:
-            return xchat.EAT_NONE
-        xchat.command("SETTEXT %s" % newinput)
-        xchat.command("SETCURSOR %d" % len(newinput))
-        return xchat.EAT_PLUGIN
-
-
-    def fishupdate(self,word, word_eol, userdata):
-        return self.update(["UPDATE","FISHCRYPT","INSTALL"],None,None)
-
-    def update(self,word, word_eol, userdata):
-        useproxy = self.config['USEPROXYUPDATE']
-        if len(word) <3:
-            print "\00313Fishcrypt.py Updater"
-            print "\00313/UPDATE FISHCRYPT [LOAD,CHANGES,DIFF,INSTALL]"
+    ## Inter Plugin communication
+    def plugin_msg(self,word, word_eol, userdata):
+        if word:
+            print "PLUGIN MSG: %r" % word_eol[0]
             return xchat.EAT_XCHAT
-        if word[1].upper() != "FISHCRYPT":
-            return xchat.EAT_NONE
-        if self.__update_thread:
-            print "\0034Update Thread already running"
+        return xchat.EAT_NONE
+
+    ## load the database
+    def cmd_dbload(self,word, word_eol, userdata):
+        
+        return xchat.EAT_ALL
+
+    ## set a password for the database
+    def cmd_dbpass(self,word, word_eol, userdata):
+        xchat.command('GETSTR "" "SET fishcrypt_passpre" "%s"' % _("New Password"))
+        return xchat.EAT_ALL
+
+    ## show either key for current chan/nick or all
+    def cmd_key(self,word, word_eol, userdata):
+        network = None
+        if len(word) >1:
+            target = word[1]
+            if target.find("@") > 0:
+                target,network = target.split("@",1)
+        else:
+            target = None
+
+        if not network:
+            target,network = self.get_id(target)
+
+        self.key_manager.show_user(target,network)
+        return xchat.EAT_ALL
+
+    ## start the DH1080 Key Exchange
+    def cmd_keyx(self,word, word_eol, userdata):
+        if len(word) >1:
+            target = word[1]
+        else:
+            target = None
+
+        target,network = self.get_id(target)
+        if not VALID_IRC_TARGET_RE.match(target):
+            debug("cmd_msg: no valid irc target")
             return xchat.EAT_ALL
-        _doExtra = None
-        if word[2].lower() == "diff":
-            if self._updatedSource:
-                self._updateDiff(xchat.get_context())
-            else:
-                _doExtra = self._updateDiff
-        if word[2].lower() == "changes":
-            if self._updatedSource:
-                self._updateChanges(xchat.get_context())
-            else:
-                _doExtra = self._updateChanges
-        if word[2].lower() == "install":
-            if self._updatedSource:
-                self._updateInstall(xchat.get_context())
-            else:
-                _doExtra = self._updateInstall
-        if word[2].lower() == "load" or _doExtra:
-            proxyload(self._update,useproxy,_doExtra)
+
+        ## FIXME chan notice - what should happen when keyx is send to channel trillian seems to accept it and send me a key --
+        if target.startswith("#"):
+            print _("Channel Exchange not implemented")
+            return xchat.EAT_ALL
+
+        msg_obj = self.key_manager.key_exchange(target,network)
+
+        if msg_obj.message:
+            self.emit_print("Notice",target,msg_obj.message,target=target)
+
+        if not msg_obj.to_network:
+            return xchat.EAT_ALL
         
-        return xchat.EAT_ALL
-        
-    def _update(self,urllib2,doExtra):
-        self.__update_thread = Thread(target=self.__update,kwargs={'urllib2':urllib2,'context':xchat.get_context(),'doExtra':doExtra},name='fishcrypt_update')
-        self.__update_thread.start()
-
-    def _updateInstall(self,context):
-        try:
-            try:
-                __fd = open(scriptname,"wb")
-                __fd.write(self._updatedSource)
-            finally:
-                __fd.close()
-            context.prnt( "\00310UPDATE Complete \r\nplease reload the script (/py reload %s)" % (script,) )
-        except:
-            context.prnt( "\002\0034UPDATE FAILED" )
-            raise
-
-    def _updateDiff(self,context):
-        currentscript = open(scriptname,"rb").read()
-        import difflib
-        for line in difflib.unified_diff(currentscript.splitlines(1),self._updatedSource.splitlines(1)):
-            context.prnt( line)
-
-    def _updateChanges(self,context):
-        currentscript = open(scriptname,"rb").read()
-        import difflib
-        for line in difflib.ndiff(currentscript[currentscript.find("# Changelog:"):currentscript.find("__module_name__")].splitlines(1),self._updatedSource[self._updatedSource.find("# Changelog:"):self._updatedSource.find("__module_name__")].splitlines(1)):
-            if len(line) > 2:
-                if line[0] in ["+","-"]:
-                    context.prnt( line[2:])
-
-    def __update(self,urllib2,context,doExtra):
-        url = UPDATEURL
-        if self.config['FISHBETAVERSION']:
-            url = BETAUPDATEURL
-        context.prnt("\0038.....checking for updates at %r... please wait ...." % url)
-        try:
-            try:
-                __updatescript = urllib2.urlopen(url,timeout=self.config['FISHUPDATETIMEOUT']).read()
-                __updateversion = re.search("__module_version__ = '([0-9]+\.[0-9]+)'",__updatescript)
-                if __updateversion:
-                    if float(__module_version__) < float(__updateversion.group(1)) or ISBETA != "":
-                        updatechksum = hashlib.sha1(__updatescript).hexdigest()
-                        if SCRIPTCHKSUM <> updatechksum:
-                            self._updatedSource = __updatescript
-                            context.prnt( "\00310Download Version %s with checksum %r complete" % (__updateversion.group(1),updatechksum))
-                        else:
-                            context.prnt( "\00310No new version available - checksums match")
-                    else:
-                        context.prnt( "\0032%sVersion %s is up to date (found Version %s)" % (__module_name__,__module_version__,__updateversion.group(1)) )
-                else:
-                    context.prnt( "\0034NO VALID PLUGIN FOUND AT %s" % (url,) )
-            except urllib2.URLError,err:
-                context.prnt( "\002\0034LOAD FAILED" )
-                context.prnt( "%r" % (err,) )
-
-            except:
-                context.prnt( "\002\0034LOAD FAILED" )
-                context.prnt("%r" % (sys.exc_info(),))
-        finally:
-            self.__update_thread = None
-            context.prnt( "\00310Update Thread finished" )
-        if doExtra and self._updatedSource:
-            doExtra(context)
+        ## lock the target
+        self.__set_proc_state(True,target=target)
+        ## send key with notice to target
+        debug("sending %r" %'QUOTE NOTICE %s %s' % (target, msg_obj.to_network))
+        xchat.command('QUOTE NOTICE %s %s' % (target, msg_obj.to_network))
+        ## release the lock
+        self.__set_proc_state(False,target=target)
 
 
-    ## Load key storage
-    def loadDB(self):
-        data = db = None
-        try:
-            try:
-                hnd = open(os.path.join(path,'fish3.pickle'),'rb')
-                data = hnd.read()
-                ## set DB loaded to False as we have a file we don't want to create a new
-                self.status['LOADED'] = False
-            except:
-                return
-        finally:
-            try:
-                hnd.close()
-            except:
-                pass
-        if data:
-            try:
-                db = pickle.loads(data)
-                print "%sUnencrypted Key Storage loaded" % (COLOR['bpurple'],)
-            except pickle.UnpicklingError:
-                ## ignore if file is invalid
-                if data.startswith("+OK *"):
-                    self.status['CRYPTDB'] = True
-                    if self.status['DBPASSWD']:
-                        try:
-                            algo = BlowfishCBC(self.status['DBPASSWD'])
-                            decrypted = mircryption_cbc_unpack(data,algo)
-                            db = pickle.loads(decrypted)
-                            print "%sEncrypted Key Storage loaded" % (COLOR['green'],)
-                        except pickle.UnpicklingError:
-                            self.status['DBPASSWD'] = None
-                            print "%sKey Storage can't be loaded with this password" % (COLOR['dred'],)
-                            print "use /DBLOAD to load it later"
-                    else:
-                        xchat.command('GETSTR ""  "SET fishcrypt_passload" "Enter your Key Storage Password"')
-                pass
-        if type(db) == dict:
-            self.status['LOADED'] = True
-            ## save temp keymap
-            oldKeyMap = self.__KeyMap
-            oldTargetMap = self.__TargetMap
-            ## fill dict with the loaded Keymap
-            self.__KeyMap = db.get("KeyMap",{})
-            self.__TargetMap = db.get("TargetMap",{})
-            self.__KeyMap.update(oldKeyMap)
-            self.__TargetMap.update(oldTargetMap)
-            for key in self.__KeyMap.keys():
-                self.__KeyMap[key].keyname = key
-                if not hasattr(self.__KeyMap[key],'protect_mode'):
-                    self.__KeyMap[key].protect_mode = False
-            self.cleanUpTargetMap()
-
-            ## only import valid config values
-            for key in self.config.keys():
-                try:
-                    self.config[key] = db["Config"][key]
-                except KeyError:
-                    pass
-            if self.config['FISHDEVELOPDEBUG']:
-                self.__hooks.append(xchat.hook_command('FISHEVAL',self.__evaldebug))
-
-    def cleanUpTargetMap(self):
-        ## DB Cleanup
-        for network in self.__TargetMap.values():
-            for target,value in network.items():
-                if type(value[1]) <> SecretKey or value[0] < time.time() - 60*60*24*7 or value[1] not in self.__KeyMap.values():
-                    del network[target]
-                    print "Expired: %r %r" % (target,value)
-
-
-    ## save keys to storage
-    def saveDB(self):
-        self.cleanUpTargetMap()
-        if not self.status['LOADED']:
-            print "Key Storage not loaded, no save. use /DBLOAD to load it"
-            return
-        try:
-            data = pickle.dumps({
-                'KeyMap': self.__KeyMap,
-                'TargetMap': self.__TargetMap,
-                'Config': self.config,
-                'Version': __module_version__ 
-            })
-            hnd = open(os.path.join(path,'fish3.pickle'),'wb')
-            if self.status['DBPASSWD']:
-                algo = BlowfishCBC(self.status['DBPASSWD'])
-                encrypted = mircryption_cbc_pack(data,algo)
-                data = encrypted
-                self.status['CRYPTDB'] = True
-            else:
-                self.status['CRYPTDB'] = False
-            hnd.write(data)
-        finally:
-            hnd.close()
-
-    def __evaldebug(self,word, word_eol, userdata):
-        eval(compile(word_eol[1],'develeval','exec'))
         return xchat.EAT_ALL
 
-    def set_dbload(self,word, word_eol, userdata):
-        self.loadDB()
+    def to_utf8(self,message):
+        charset = xchat.get_info('charset')
+        if charset == "IRC":
+            charset = "utf-8"
+        try:
+            unicode_message = message.decode(charset)
+            debug("to_utf8: %r (%r) (%r)" % (charset,unicode_message,message))
+        except UnicodeError,e:
+            debug("to_utf8: UnicodeError: %r" % (e,))
+            unicode_message = unicode(message,charset,'replace')
+        except LookupError,e:
+            debug("to_utf8: LookupError: %r" % (e,))
+            unicode_message = unicode(message,"utf-8",'replace')
+        #return unicode_message.encode("utf-8")
+        return message
+
+    ## print encrypted localy
+    def cmd_prncrypt(self,word, word_eol, userdata):
+        if len(word_eol) < 2:
+            self.usage(userdata)
+            return xchat.EAT_ALL
+        message = self.to_utf8(word_eol[1])
+        target, network = self.get_id()
+        msg_obj = self.key_manager.encrypt(message,target,network,enforce=True)
+        if not msg_obj:
+            ## No crypto information found
+            prnt (_("\0034No Key found for %s") %  target)
+            return xchat.EAT_ALL
+        prnt ("\0032%s" % msg_obj.to_network)
         return xchat.EAT_ALL
 
-    def set_dbpass(self,word, word_eol, userdata):
-        xchat.command('GETSTR "" "SET fishcrypt_passpre" "New Password"')
+    ## print decrypted localy
+    def cmd_prndecrypt(self,word, word_eol, userdata):
+        if len(word_eol) < 2:
+            self.usage(userdata)
+            return xchat.EAT_ALL
+        message = word_eol[1]
+        target, network = self.get_id()
+        msg_obj = self.key_manager.decrypt(message,target,network)
+        if not msg_obj:
+            ## No crypto information found
+            prnt (_("\0034No Key found for %s") %  target)
+            return xchat.EAT_ALL
+            
+        prnt ("\0032%s" % msg_obj.message )
         return xchat.EAT_ALL
 
-    ## set keydb passwd
-    def settings(self,word, word_eol, userdata):
+    ## manual set a key for a nick or channel
+    def cmd_setkey(self,word, word_eol, userdata):
+        if len(word) < 2:
+            self.usage(userdata)
+            return xchat.EAT_ALL
+        target, network = self.get_id()
+        key = word[1]
+        if len(word) > 2:
+            target = word[1]
+            if target.find("@") > 0:
+                target,network = target.split("@",1)
+            key = word[2]
+        try:
+            self.key_manager.set_key(key,target,network)
+        except KeySizeError,e:
+            prnt(e)
+        return xchat.EAT_ALL
+
+    ## delete a key or all
+    def cmd_delkey(self,word, word_eol, userdata):
+
+        return xchat.EAT_ALL
+
+    ## settings and password handler
+    def cmd_set(self,word, word_eol, userdata):
+        debug("cmd_set: (%r) %r" % (userdata,word_eol[0]))
         fishonly = False
         if len(word) == 2:
             if word[1].upper() == "FISHCRYPT":
@@ -731,7 +949,7 @@ class XChatCrypt:
                 self.status['CHKPW'] = ""
             else:
                 self.status['CHKPW'] = word_eol[2]
-            xchat.command('GETSTR ""  "SET fishcrypt_pass" "Repeat the Password"')
+            xchat.command('GETSTR ""  "SET fishcrypt_pass" "%s"' % _("Repeat the Password"))
             return xchat.EAT_ALL
 
         if word[1] == "fishcrypt_pass":
@@ -741,36 +959,36 @@ class XChatCrypt:
                     self.status['CHKPW'] = None
                     return xchat.EAT_ALL
                 self.status['DBPASSWD'] = None
-                print "%sPassword removed and Key Storage decrypted" % (COLOR['dred'],)
-                print "%sWarning Keys are plaintext" % (COLOR['dred'],)
+                print _("\0034Password removed and Key Storage decrypted")
+                print _("\0034Warning Keys are plaintext")
             else:
                 if self.status['CHKPW'] <> None and self.status['CHKPW'] <> word_eol[2]:
                     print "Passwords don't match"
                     self.status['CHKPW'] = None
                     return xchat.EAT_ALL
                 if len(word_eol[2]) < 8 or len(word_eol[2]) > 56:
-                    print "Passwords must be between 8 and 56 chars"
+                    print _("Passwords must be between 8 and 56 chars")
                     self.status['CHKPW'] = None
                     return xchat.EAT_ALL
                 self.status['DBPASSWD'] = word_eol[2]
                 ## don't show the pw on console if set per GETSTR
                 if self.status['CHKPW'] == None:
-                    print "%sPassword for Key Storage encryption set to %r" % (COLOR['dred'],self.status['DBPASSWD'])
+                    print _("\0034Password for Key Storage encryption set to %r") % self.status['DBPASSWD']
                 else:
-                    print "%sKey Storage encrypted" % (COLOR['dred'])
+                    print _("\0034Key Storage encrypted")
             self.status['CHKPW'] = None
-            self.saveDB()
+            ##self.saveDB()
             return xchat.EAT_ALL
 
         if word[1] == "fishcrypt_passload":
             if len(word) > 2:
                 if len(word_eol[2]) < 8 or len(word_eol[2]) > 56:
-                    print "Password not between 8 and 56 chars"
+                    print _("Password not between 8 and 56 chars")
                 else:
                     self.status['DBPASSWD'] = word_eol[2]
-                    self.loadDB()
+                    ##self.loadDB()
             else:
-                print "Key Storage Not loaded"
+                print _("Key Storage Not loaded")
                 self.status['DBPASSWD'] = None
             return xchat.EAT_ALL
 
@@ -786,908 +1004,525 @@ class XChatCrypt:
                     else:
                         self.config[key] = type(self.config[key])(word_eol[2])
                     print "\0035Set %r to %r" % (key,word_eol[2])
-                    self.saveDB()
+                    ##self.saveDB()
                 except ValueError:
-                    print "\0034Invalid Config Value %r for %s" % (word_eol[2],key)
+                    print _("\0034Invalid Config Value %r for %s") % (word_eol[2],key)
             return xchat.EAT_ALL
 
         return xchat.EAT_NONE
 
-    ## incoming notice received
-    def on_notice(self,word, word_eol, userdata):
-        ## check if this is not allready processed
-        if self.__chk_proc():
-            return xchat.EAT_NONE
+    ## set cbc mode or show the status
+    def cmd_cbcmode(self,word, word_eol, userdata):
+        return xchat.EAT_ALL
 
-        ## check if DH Key Exchange
-        if word_eol[3].startswith(':DH1080_FINISH'):
-            return self.dh1080_finish(word, word_eol, userdata)
-        elif word_eol[3].startswith(':DH1080_INIT'):
-            return self.dh1080_init(word, word_eol, userdata)
+    ## set key protection mode or show the status
+    def cmd_protectkey(self,word, word_eol, userdata):
+        return xchat.EAT_ALL
 
-        ## check for encrypted Notice
-        elif word_eol[3].startswith('::+OK ') or word_eol[3].startswith('::mcps '):
-            
-            ## rewrite data to pass to default inMessage function
-            ## change full ident to nick only
-            nick = self.get_nick(word[0])
-            target = word[2]
-            speaker = nick
-            ## strip :: from message
-            message = word_eol[3][2:]
-            if target.startswith("#"):
-                id = self.get_id()
-                speaker = "## %s" % speaker
+    ## activate/deaktivate encryption für chan/nick
+    def cmd_encrypt(self,word, word_eol, userdata):
+        return xchat.EAT_ALL
+
+    ## outgoing messages will be proccesed here
+    def cmd_msg(self,word, word_eol, userdata):
+        debug ("cmd_msg: %r userdata: %r" % (word, userdata))
+        enforce = False
+        command = "PRIVMSG"
+        message_format = "%s"
+        target = None
+        text_event = None
+        target_context = None
+        ## check if we are called with a command
+        if userdata:
+            if len(word) < (userdata.startswith("ME") and 2 or 3):
+                ## not enough parameter to run this command
+                self.usage(userdata)
+                return xchat.EAT_XCHAT
+
+            if userdata.startswith("ME"):
+                message_format = "\001ACTION %s\001"
+                text_event = "Channel Action"
+                message = word_eol[1]
             else:
-                id = self.get_id(nick=nick)
-            #print "DEBUG(crypt): key: %r word: %r" % (id,word,)
-            key = self.find_key(id)
-            ## if no key found exit
-            if not key:
-                return xchat.EAT_NONE
-            
-            ## decrypt the message
-            try:
-                sndmessage = self.decrypt(key,message)
-            except:
-                sndmessage = None
-            isCBC=0
-            if message.startswith("+OK *"):
-                isCBC=1
-            failcol = ""
+                target = word[1]
+                message = word_eol[2]
 
-            ## if decryption was possible check for invalid chars
-            if sndmessage:
-                try:
-                    message = sndmessage.decode("UTF8").encode("UTF8")
-                    ## mark nick for encrypted msgg
-                    speaker = "%s %s" % ("°"*(1+isCBC),speaker)
-                except UnicodeError:
-                    try:
-                        message = unicode(sndmessage,encoding='iso8859-1',errors='ignore').encode('UTF8')
-                        ## mark nick for encrypted msgg
-                        speaker = "%s %s" % ("°"*(1+isCBC),speaker)
-                    except:
-                        raise
-                    ## send the message to local xchat
-                    #self.emit_print(userdata,speaker,message)
-                    #return xchat.EAT_XCHAT
-                except:
-                    ## mark nick with a question mark
-                    speaker = "?%s" % (speaker)
-                    failcol = "\003"
-            else:
-                failcol = "\003"
-            ## mark the message with \003, it failed to be processed and there for the \003+OK  will no longer be excepted as encrypted so it wont loop
-            self.emit_print(userdata,speaker,"%s%s" % (failcol,message))
-            return xchat.EAT_XCHAT
-#            return self.inMessage([nick,msg], ["%s %s" % (nick,msg),msg], userdata)
+            ## commands with a + enforce encryption even if encryption is disabled
+            if userdata.find("+") != -1:
+                enforce = True
 
-        ## ignore everything else
+            if userdata.startswith("NOTICE"):
+                command = "NOTICE"
+                text_event = "Notice"
+
         else:
-            #print "DEBUG: %r %r %r" % (word, word_eol, userdata)
+            message = word_eol[0]
+
+        target,network = self.get_id(target)
+
+        ## if target is not a valid IRC nick or channel
+        if not VALID_IRC_TARGET_RE.match(target):
+            debug("cmd_msg: no valid irc target")
+            return xchat.EAT_NONE
+            
+        ## check if allready processed
+        if self.__check_proc_state(target):
             return xchat.EAT_NONE
 
-    ## local notice send messages
-    def on_notice_send(self,word, word_eol, userdata):
-        ## get current nick
-        target = xchat.get_context().get_info('nick')
-        #print "DEBUG_notice_send: %r - %r - %r %r" % (word,word_eol,userdata,nick)
-        
-        ## check if this is not allready processed
-        if self.__chk_proc(target=target):
-            return xchat.EAT_NONE
-        
-        ## get the speakers nick only from full ident
-        speaker = self.get_nick(word[0])
-        
-        ## strip first : from notice
-        message = word_eol[1][1:]
-        if message.startswith('+OK ') or message.startswith('mcps '):
-            ## get the key id from the speaker
-            id = self.get_id(nick=speaker)
-            key = self.find_key(id)
-            
-            ## if no key available for the speaker exit
-            if not key:
+        nick = xchat.get_context().get_info('nick')
+        message = self.to_utf8(message)
+
+        ## check if we have an open tab for the target
+        target_tab = xchat.find_context(channel=target)
+        if not text_event:
+            if not target_tab and target_tab != xchat.get_context():
+                ## show in same tab
+                text_event = "Message Send"
+                nick = target
+            else:
+                ## show in users query tab
+                text_event = "Your Message"
+                target_context = target_tab
+
+        maxlen = self.key_manager.config['MAXMESSAGELENGTH']
+        ## split large messages to multiple smaller
+        while len(message) >0:
+            ## check if the message needs to be encrypted
+            msg_obj = self.key_manager.encrypt(message[:maxlen],target,network,enforce=enforce)
+
+            if not msg_obj:
+                ## No crypto information found
+                debug ("cmd_msg: not crypto information found")
                 return xchat.EAT_NONE
+            #if not prefix:
+            #    message = crypted_message
+            ## show the unencrypted localy
+            if command == "NOTICE":
+                ## add the target nick or channel to the nick
+                nick = "%s/%s" % (nick,target)
             
-            ## decrypt the message
-            sndmessage = self.decrypt(key,message)
-            isCBC = 0
-            if message.startswith("+OK *"):
-                isCBC = 1
-                if not target.startswith("#"):
-                    ## if we receive a messge with CBC enabled we asume the partner can also except it so activate it
-                    key.cbc_mode = True
+            ## FIXME unicode usw...
+            ## add prefix with info about encryption to the nick and send it with the unencrypted message to local target
+            self.emit_print(text_event,"%s%s" % (msg_obj.prefix,nick) ,msg_obj.message,target=target,target_context=target_tab)
 
-            ## if decryption was possible check for invalid chars
+            if msg_obj.to_network:
+                ## send encrypted message to target
+                self.__set_proc_state(True,target=target)
+                debug ("cmd_msg: sending %r to the server" % 'QUOTE %s %s :%s' % (command,target, message_format % msg_obj.to_network))
+                xchat.command('QUOTE %s %s :%s' % (command,target, message_format % msg_obj.to_network))
+                self.__set_proc_state(False,target=target)
+            message = message[maxlen:]
+        return xchat.EAT_ALL
 
-            if sndmessage:
-                try:
-                    message = sndmessage.decode("UTF8").encode("UTF8")
-                    ## mark nick for encrypted msgg
-                    speaker = "%s %s" % ("°"*(1+isCBC),speaker)
-                except:
-                    ## mark nick with a question mark
-                    speaker = "?%s" % (speaker)
-                    ## send original message because invalid chars
-                    message = message
+    ## incoming notice received
+    def server_notice(self,word, word_eol, userdata):
+        debug ("server_notice: %r userdata: %r" % (word, userdata))
+        if len(word) < 3:
+            return xchat.EAT_NONE
+        target = word[2]
 
-            ## send the message back to incoming notice but with locked target status so it will not be processed again
-            self.emit_print("Notice Send",speaker,message,target=target)
-            return xchat.EAT_XCHAT
-        return xchat.EAT_NONE
-            
+        ## extract the nick from the usermask
+        speaker = self.get_nick(word[0])
+
+        ## remove leading : 
+        message = word_eol[3].lstrip(":")
+
+        if target.startswith("#"):
+            target,network = self.get_id()
+            speaker = "%s/%s" % (speaker,target)
+        else:
+            target,network = self.get_id(target)
+
+        ## check if allready processing
+        if self.__check_proc_state(target):
+            return xchat.EAT_NONE
+
+        msg_obj = self.key_manager.decrypt(message,speaker,network)
+        debug("server_notice:",message=message)
+        ## if not encrypted leave it to xchat
+        if not msg_obj:
+            debug ("server_notice: not encrypted")
+            return xchat.EAT_NONE
+
+        if msg_obj.message:       
+            ## show the unencrypted message prefixed with encryption info prefixed to the nick
+            self.emit_print(userdata,"%s%s" % (msg_obj.prefix,speaker),msg_obj.message,target=target)
+
+
+        if msg_obj.to_network:
+            self.__set_proc_state(True,target=target)
+            debug ("server_notice: sending %r to the server" % 'QUOTE NOTICE %s :%s' % (speaker,msg_obj.to_network))
+            xchat.command('QUOTE NOTICE %s :%s' % (speaker,msg_obj.to_network))
+            self.__set_proc_state(False,target=target)
+        
+        return xchat.EAT_XCHAT
+
+    ## handle topic server message
+    def server_topic(self,word, word_eol, userdata):
+        debug ("server_topic %r userdata: %r" % (word,userdata))
+        
+        ## 322 message parameter are different
+        if userdata == '332':
+            server, cmd, nick, channel, topic = word[0], word[1], word[2], word[3], word_eol[4]
+        else:
+            server, cmd, channel, topic = word[0], word[1], word[2], word_eol[3]
+
+        target,network = self.get_id(channel)
+
+        ## check if allready processing
+        if self.__check_proc_state(target):
+            debug("server_topic: allready processing")
+            return xchat.EAT_NONE
+
+        ## remove the leading :
+        topic = topic[1:]
+        msg_obj = self.key_manager.decrypt(topic,target,network)
+
+        ## if its not encrypted leave
+        if not msg_obj:
+            debug("server_topic: not encrypted")
+            return xchat.EAT_NONE
+
+        ## lock the target
+        self.__set_proc_state(True,target=target)
+
+        ## send the message to xchat
+        if userdata == '332':
+            xchat.command('RECV %s %s %s %s :%s%s' % (server, cmd, nick, channel, msg_obj.prefix,msg_obj.message.replace("\x00","")))
+        else:
+            xchat.command('RECV %s %s %s :%s%s' % (server, cmd, channel, msg_obj.prefix,msg_obj.message.replace("\x00","")))
+        ## release the lock
+        self.__set_proc_state(False,target=target)
+
+        return xchat.EAT_ALL
+
     ## incoming messages
-    def inMessage(self,word, word_eol, userdata):
-        ## if message is allready processed ignore
-        if self.__chk_proc() or len(word_eol) < 2:
-            return xchat.EAT_PLUGIN
+    def print_msg(self,word, word_eol, userdata):
+        debug ("print_msg: %r userdata: %r" % (word, userdata))
 
         speaker = word[0]
         message = word_eol[1]
-        #print "DEBUG(INMsg): %r - %r - %r" % (word,word_eol,userdata)
-        # if there is mode char, remove it from the message
+
+        if userdata.startswith("Private"):
+            target = speaker
+        else:
+            target = None
+
+        target,network = self.get_id(target)
+        
+        ## check if allready processing
+        if self.__check_proc_state(target):
+            debug("print_msg: allready processing")
+            return xchat.EAT_NONE
+
+        ## remove mode char from message
         if len(word_eol) >= 3:
-            #message = message[ : -(len(word_eol[2]) + 1)]
             message = message[:-2]
 
-        ## check if message is crypted
-        if message.startswith('+OK ') or message.startswith('mcps '):
-            target = None
-            if userdata == "Private Message":
-                target = speaker
-            id = self.get_id(nick=target)
-            target,network = id
-            key = self.find_key(id)
-            
-            ## if no key found exit
-            if not key:
-                return xchat.EAT_NONE
-            
-            ## decrypt the message
-            try:
-                sndmessage = self.decrypt(key,message)
-            except:
-                sndmessage = None
-            isCBC=0
-            if message.startswith("+OK *"):
-                isCBC=1
-                if not target.startswith("#"):
-                    ## if we receive a messge with CBC enabled we asume the partner can also except it so activate it
-                    key.cbc_mode = True
-
-            failcol = ""
-
-            ## if decryption was possible check for invalid chars
-            if sndmessage:
-                try:
-                    message = sndmessage.decode("UTF8").encode("UTF8")
-                    ## mark nick for encrypted msgg
-                    speaker = "%s %s" % ("°"*(1+isCBC),speaker)
-                except UnicodeError:
-                    try:
-                        message = unicode(sndmessage,encoding='iso8859-1',errors='ignore').encode('UTF8')
-                        ## mark nick for encrypted msgg
-                        speaker = "%s %s" % ("°"*(1+isCBC),speaker)
-                    except:
-                        raise
-                    ## send the message to local xchat
-                    #self.emit_print(userdata,speaker,message)
-                    #return xchat.EAT_XCHAT
-                except:
-                    ## mark nick with a question mark
-                    speaker = "?%s" % (speaker)
-                    failcol = "\003"
-            else:
-                failcol = "\003"
-            ## mark the message with \003, it failed to be processed and there for the \003+OK  will no longer be excepted as encrypted so it wont loop
-            self.emit_print(userdata,speaker,"%s%s" % (failcol,message))
-            return xchat.EAT_ALL
-
-        return xchat.EAT_NONE
-
-    def decrypt(self,key,msg):
-        ## check for CBC
-        if 3 <= msg.find(' *') <= 4:
-            decrypt_clz = BlowfishCBC
-            decrypt_func = mircryption_cbc_unpack
-        else:
-            decrypt_clz = Blowfish
-            decrypt_func = blowcrypt_unpack
-        try:
-            b = decrypt_clz(key.key)
-            #if msg[-2:-1] == " ":
-            #	msg = msg[:-2]
-            ret = decrypt_func(msg, b)
-        except MalformedError:
-            try:
-                cut = (len(msg) -4)%12
-                if cut > 0:
-                    msg = msg[:cut *-1]
-                    ret = "%s%s" % ( decrypt_func(msg, b), " \0038<<incomplete>>" * (cut>0))
-                else:
-                    #print "Error Malformed %r" % len(msg)
-                    ret = None
-            except MalformedError:
-                #print "Error2 Malformed %r" % len(msg)
-                ret = None
-        except:
-            print "Decrypt ERROR"
-            ret = None
-        return ret
-
-
-    ## mark outgoing message being  prefixed with a command like /notice /msg ...
-    def outMessageCmd(self,word, word_eol, userdata):
-        return self.outMessage(word, word_eol, userdata,command=True)
-
-    ## mark outgoing message being prefixed with a command that enforces encryption like /notice+ /msg+
-    def outMessageForce(self,word, word_eol, userdata):
-        return self.outMessage(word, word_eol, userdata, force=True,command=True)
-
-    ## the outgoing messages will be proccesed herre
-    def outMessage(self,word, word_eol, userdata,force=False,command=False):
+        msg_obj = self.key_manager.decrypt(message,target,network)
         
-        ## check if allready processed
-        if self.__chk_proc():
+        ## nothing encrypted found leave
+        if not msg_obj:
             return xchat.EAT_NONE
-        
-        ## get the id
-        id = self.get_id()
-        target,network = id
-        ## check if message is prefixed wit a command like /msg /notice
-        action = False
-        if command:
-            
-            if len(word) < (word[0].upper().startswith("ME") and 2 or 3):
-                print "Usage: %s <nick/channel> <message>, sends a %s.%s are a type of message that should be auto reacted to" % (word[0],word[0],word[0])
-                return xchat.EAT_ALL
-            ## notice and notice+
-            if word[0].upper().startswith("NOTICE"):
-                command = "NOTICE"
-            else:
-                command = "PRIVMSG"
-            if word[0].upper().startswith("ME"):
-                action = True
-                message = word_eol[1]
-            else:
-                ## the target is first parameter after the command, not the current channel
-                target = word[1]
-                ## change id
-                id = (target,network)
-                ## remove command and target from message
-                message = word_eol[2]
-        else:
-            command = "PRIVMSG"
-            message = word_eol[0]
 
-        sendmsg = ''
-        ## try to get a key for the target id
-        key = self.find_key(id)
-        
-        ## my own nick
-        nick = xchat.get_context().get_info('nick')
+        ## send the unencrypted message prefixed with encryption info to the target
+        self.emit_print(userdata,"%s%s" % (msg_obj.prefix,speaker),msg_obj.message,target=target)
 
-        #print "DEBUG(outMsg1)(%r) %r : %r %r" % (id,xchat.get_context().get_info('network'),word,nick)
-
-        ## if we don't have a key exit
-        if not key:
-            return xchat.EAT_NONE
-        
-        ## if the key object is there but the key deleted or marked not active...and force is not set by command like /msg+ or /notice+
-        if key.key == None or (key.active == False and not force):
-            return xchat.EAT_NONE
-        
-        ## if the message is marked with the plaintextmarker (default +p) don't encrypt
-        if message.startswith(self.config['PLAINTEXTMARKER']):
-            ## remove the plaintextmarker from the message
-            sendmessages = [message[len(self.config['PLAINTEXTMARKER'])+1:]]
-            messages = sendmessages
-        else:
-            ## encrypt message
-            maxlen = self.config['MAXMESSAGELENGTH']
-            cutmsg = message
-            messages = []
-            sendmessages = []
-            while len(cutmsg) >0:
-                sendmessages.append(self.encrypt(key,cutmsg[:maxlen]))
-                messages.append(cutmsg[:maxlen])
-                cutmsg = cutmsg[maxlen:]
-            ## mark the nick with ° for encrypted messages
-            nick = "%s %s" % ("°"*(1+key.cbc_mode),nick)
-
-        #print "DEBUG(outMsg2): %r %r %r %r" % (command,message,nick,target)
-
-        for sendmsg in sendmessages:
-            ## lock the target
-            self.__lock_proc(True)
-            ## send the command (PRIVMSG / NOTICE)
-            if action:
-                sendmsg = "\001ACTION %s\001" % sendmsg
-            xchat.command('%s %s :%s' % (command,target, sendmsg))
-            ## release the lock
-            self.__lock_proc(False)
-        
-        for message in messages:
-            ## if it is no notice it must be send plaintext to xchat for you
-            if command == "PRIVMSG":
-                if action:
-                    self.emit_print('Channel Action',  nick, message)
-                else:
-                    targetTab= xchat.find_context(channel=target)
-                    if not targetTab and targetTab != xchat.get_context():
-                        self.emit_print('Message Send',  "%s %s" % ("°"*(1+key.cbc_mode),target), message)
-                    else:
-                        self.emit_print('Your Message',  nick, message,toContext=targetTab)
         return xchat.EAT_ALL
         
-    def encrypt(self,key, msg):
-        if key.cbc_mode:
-            encrypt_clz = BlowfishCBC
-            encrypt_func = mircryption_cbc_pack
+
+    ## handle notices
+    def print_notice(self,word, word_eol, userdata):
+        debug ("print_notice: %r userdata: %r" % (word, userdata))
+        ## check if allready processing
+        if self.__check_proc_state():
+            ## is allready handled
+            debug ("EAT IT")
+            return xchat.EAT_ALL
+        return xchat.EAT_NONE
+
+    ## trace nick changes
+    def print_nick(self,word, word_eol, userdata):
+        print "DEBUG print_nick: %r userdata: %r" % (word, userdata)
+        return xchat.EAT_NONE
+
+    ## handle keypress
+    def print_keypress(self,word, word_eol, userdata):
+        if word[0] not in ["65289","65056"]:
+            return xchat.EAT_NONE
+        input = xchat.get_info('inputbox')
+        if input.upper().startswith("/SET F"):
+            newinput = "/SET FISHCRYPT "
         else:
-            encrypt_clz = Blowfish
-            encrypt_func = blowcrypt_pack
-        b = encrypt_clz(key.key)
-        return encrypt_func(msg, b)
+            return xchat.EAT_NONE
+        xchat.command("SETTEXT %s" % newinput)
+        xchat.command("SETCURSOR %d" % len(newinput))
+        return xchat.EAT_PLUGIN
+
 
     ## send message to local xchat and lock it
-    def emit_print(self,userdata,speaker,message,target=None,toContext=None):
-        if not toContext:
-            toContext = xchat.get_context()
+    def emit_print(self,userdata,speaker,message,target=None,target_context=None):
+        debug ("emt_print:", userdata=userdata,speaker=speaker,target=target,target_context=target_context,message=message)
+        ## if no target context 
+        if not target_context:
+            ## use the current one
+            target_context = xchat.get_context()
+
+        ## FIXME
         if userdata == None:
             ## if userdata is none its possible Notice
+            print "NEEDED??"
             userdata = "Notice"
+
         if not target:
             ## if no special target for the lock is set, make it the speaker
             target = speaker
+
         ## lock the processing of that message
-        self.__lock_proc(True,target=target)
+        self.__set_proc_state(True,target=target)
+
+        ## FIXME
         ## check for Highlight
         for hl in [xchat.get_info('nick')] + xchat.get_prefs("irc_extra_hilight").split(","):
             if len(hl) >0 and message.find(hl) > -1:
                 if userdata == "Channel Message":
                     userdata = "Channel Msg Hilight"
                 xchat.command("GUI COLOR 3")
+
         ## send the message
-        toContext.emit_print(userdata,speaker, message.replace('\0',''))
+        target_context.emit_print(userdata,speaker, message.replace('\0',''))
         ## release the lock
-        self.__lock_proc(False,target=target)
+        self.__set_proc_state(False,target=target)
 
     ## set or release the lock on the processing to avoid loops
-    def __lock_proc(self,state,target=None):
+    def __set_proc_state(self,state,target=None):
         ctx = xchat.get_context()
         if not target:
             ## if no target set, the current channel is the target
             target = ctx.get_info('channel')
         ## the lock is NETWORK-TARGET
         id = "%s-%s" % (ctx.get_info('network'),target)
-        self.__lockMAP[id] = state
+        debug ("__set_proc_state: %r %s" % (id,state))
+        self.__context_lock_map[id] = state
 
     ## check if that message is allready processed to avoid loops
-    def __chk_proc(self,target=None):
+    def __check_proc_state(self,target=None):
         ctx = xchat.get_context()
         if not target:
             ## if no target set, the current channel is the target
             target = ctx.get_info('channel')
         id = "%s-%s" % (ctx.get_info('network'),target)
-        return self.__lockMAP.get(id,False)
+        state = self.__context_lock_map.get(id,False)
+        debug ("__check_proc_state: %r %s" % (id,state))
+        return state
+
+    def get_chan_type(self,ctx):
+        ret = filter(lambda chan,ctx=ctx: chan.context==ctx,xchat.get_list('channels'))
+        if not ret:
+            return -1
+        return ret[0].type
 
     # get an id from channel name and networkname
-    def get_id(self,nick=None):
+    def get_id(self,target=None):
         ctx = xchat.get_context()
-        if nick:
-            target = nick
-        else:
+        if not target:
             target = str(ctx.get_info('channel'))
+            if self.get_chan_type(ctx) < 2:
+                target = "????"
+
         ##return the id
-        return (target, str(ctx.get_info('network')).lower())
+        network = ctx.get_info('network')
+        if not network:
+            network = ctx.get_info('server')
+        if not network:
+            network = 'unknown'
+        network = network.replace("*","_")
+        return (target, network.lower())
 
-    def find_key(self,id,create=None):
-        key = self.__KeyMap.get(id,None)
-        target, network = id
-        networkmap = self.__TargetMap.get(network,None)
-        if not networkmap:
-            networkmap = {}
-            self.__TargetMap[network] = networkmap
-        if not key:
-            lastaxx,key = networkmap.get(target,(-1,None))
-        else:
-            for _target,_key in filter(lambda x: x[1] == key,networkmap.items()):
-                if _target != target:
-                    del networkmap[_target]
-        if not key and create:
-            key = create
-        if key:
-            self.__TargetMap[network][target] = (int(time.time()),key)
-        return key
+### Weechat ###
+class weechat_client_interface(irc_client_interface):
+    def __init__(self):
+        self.interface_type = "weechat"
+        weechat.register(SCRIPT_NAME, SCRIPT_AUTHOR, SCRIPT_VERSION,SCRIPT_LICENSE, SCRIPT_DESC, "weechat_unload_helper", "")
 
-    ## return the nick only
-    def get_nick(self,full):
-        if full[0] == ':':
-            full = full[1:]
-        try:
-            ret = full[:full.index('!')]
-        except ValueError:
-            ret  = full
-        return ret
+        weechat.hook_modifier("irc_in_privmsg", "weechat_server_message_helper", "")
+        weechat.hook_modifier("irc_in_notice",  "weechat_server_message_helper", "")
+        weechat.hook_modifier("irc_in_topic",   "weechat_server_message_helper", "")
+        weechat.hook_modifier("irc_in_332",     "weechat_server_message_helper", "")
+        weechat.hook_print("","notify_message","",0,"weechat_prnt_message_helper","a1")
+        #weechat.hook_print("","notify_private","",0,"weechat_prnt_message_helper","a2")
+        #weechat.hook_print("","notify_highlight","",0,"weechat_prnt_message_helper","a1")
 
-    ## print encrypted localy
-    def prn_crypt(self,word, word_eol, userdata):
-        id = self.get_id()
-        target, network = id
-        key = self.find_key(id)
-        if len(word_eol) < 2:
-            print "usage: /PRNCRYPT <msg to encrypt>"
-        else:    
-            if key:
-                print "%s%s" % (COLOR['blue'],self.encrypt(key,word_eol[1]))
-            else:
-                print "%sNo known Key found for %s" % (COLOR['red'],target,)
-        return xchat.EAT_ALL
+        weechat.hook_modifier('irc_out_privmsg', 'weechat_outmessage_helper', '')
+        self.hook_cmd("NOTICE+")
+        self.hook_cmd("MSG+")
+        self.hook_cmd("ME+")
 
-    ## print decrypted localy
-    def prn_decrypt(self,word, word_eol, userdata):
-        id = self.get_id()
-        target, network = id
-        key = self.find_key(id)
-        if len(word_eol) < 2:
-            print "usage: /PRNDECRYPT <msg to decrypt>"
-        else:    
-            if key:
-                print "%s%s" % (COLOR['blue'],self.decrypt(key,word_eol[1]))
-            else:
-                print "%sNo known Key found for %s" % (COLOR['red'],target,)
-        return xchat.EAT_ALL
+        #self.hook_cmd("KEYX")
+        weechat.hook_command("KEYX",'DH1080 Key exchange','[NICK]','','%(nick)','weechat_command_helper',"KEYX")
+        weechat.hook_command("SETKEY",'set Key for nick or channel','[NICK NETWORK]','','%(nick)','weechat_command_helper',"SETKEY")
 
+        self.hook_cmd("CBCMODE")
+        self.key_manager = key_manager()
 
-    ## manual set a key for a nick or channel
-    def set_key(self,word, word_eol, userdata):
-        id = self.get_id()
-        target, network = id
-        
-        ## if more than 2 parameter the nick/channel target is set to para 1 and the key is para 2
-        if len(word) > 2:
-            target = word[1]
-            if target.find("@") > 0:
-                target,network = target.split("@",1)
-            newkey = word[2]
-            id = (target,network)
-        ## else the current channel/nick is taken as target and the key is para 1
-        else:
-            newkey = word[1]
-        if len(newkey) < 8 or len(newkey) > 56:
-            print "Key must be between 8 and 56 chars"
-            return xchat.EAT_ALL
-        ## get the Keyobject if available or get a new one
-        key = self.find_key(id,create=SecretKey(None,protectmode=self.config['DEFAULTPROTECT'],cbcmode=self.config['DEFAULTCBC']))
-        ## set the key 
-        key.key = newkey
-        key.keyname = id
-        ## put it in the key dict
-        self.__KeyMap[id] = key
+    def hook_cmd(self,command):
+        weechat.hook_command(command,'description','start [NICK NETWORK]','','start %(nick)','weechat_command_helper',command)
 
-        print "Key for %s on Network %s set to %r" % ( target,network,newkey)
-        ## save the key storage
-        self.saveDB()
-        return xchat.EAT_ALL
+    def unload_interface(self):
+        destroy_client_interface()
+        return weechat.WEECHAT_RC_OK
 
-    ## delete a key or all
-    def del_key(self,word, word_eol, userdata):
-        ## don't accept no parameter
-        if len(word) <2:
-            print "Error: /DELKEY nick|channel|* (* deletes all keys)"
-            return xchat.EAT_ALL
-        target = word_eol[1]
-        ## if target name is * delete all
-        if target == "*":
-            self.__KeyMap = {}
-        else:
-            if target.find("@") > 0:
-                target,network = target.split("@",1)
-                id = target,network
-            else:            
-                id = self.get_id(nick=target)
-                target,network = id
-            ## try to delete the key
-            try:
-                del self.__KeyMap[id]
-                print "Key for %s on %s deleted" % (target,network)
-            except KeyError:
-                print "Key %r not found" % (id,)
-        ## save the keystorage
-        self.saveDB()
-        return xchat.EAT_ALL
+    def server_message(self,data, modifier, modifier_data, string):
+        debug ("in_message",data=data,modifier=modifier,modifier_data=modifier_data,string=string)
+        #DEBUG: in_message [{'modifier_data': 'Prooops', 'modifier': 'irc_in_NOTICE',  'data': 'irc_in_notice',  'string': ':hrh23!trubo@go.to.sleep NOTICE trubo_ DH1080_INIT S8TvfqT8a/XKM/6qa5m+1sSoIatpMR63LHbrxAJe5dSUumNiUeIx4gLqHJEJ8hszhb0XBO+nVeA90mvqMAqm7UfdpuIK1K3uOgCJL/8GqTltSk4rBw7Nlno65DL1yuPuolW6hAuWbrQ6CQnG0LeaUZuO47QJNXaMyPneRRHiJcxcr+ta64vkA'}]
+        #DEBUG: in_message [{'modifier_data': 'Prooops', 'modifier': 'irc_in_TOPIC',   'data': 'irc_in_topic',   'string': ':hrh23!trubo@go.to.sleep TOPIC #fishtest :+OKt7d8m.3k/hu01z/X//Zb1ap1'}]
+        #DEBUG: in_message [{'modifier_data': 'Prooops', 'modifier': 'irc_in_332',     'data': 'irc_in_332',     'string': ':kardia.prooops.com 332 trubo_ #fishtest :+OKt7d8m.3k/hu01z/X//Zb1ap1'}]        
+        #DEBUG: in_message [{'modifier_data': 'Prooops', 'modifier': 'irc_in_PRIVMSG', 'data': 'irc_in_privmsg', 'string': ':hrh23!trubo@go.to.sleep PRIVMSG #fishtest :+OK 4ViEr0.yJYd1'}]
+        #IRC_PRIVMSG_RE      = re.compile("(:(?P<from>(?P<from_nick>.+?)!(?P<from_user>.+?)@(?P<from_host>.+?))\ )?PRIVMSG\ (?P<to>.+?)\ :(?P<text>.+)")
+        word = string.split(" ")
+        network = modifier_data
+        fulluser = word[0]
+        command = word[1].upper()
+        target = word[2]
+        message = " ".join(word[3:]).lstrip(":")
+        speaker = self.get_nick(fulluser)
+        msg_obj = self.key_manager.decrypt(message,speaker,network)
+        debug("server_message: %r" % msg_obj)
+        if msg_obj:
+            string = "%s %s %s :%s" % (fulluser,command,target,msg_obj.message)
+            debug("message string: %r" % string)
 
-    ## show either key for current chan/nick or all
-    def show_key(self,word, word_eol, userdata):
-        ## if no parameter show key for current chan/nick
-        if len(word) <2:
-            id = self.get_id()
-        else:
-            target = word_eol[1]
-            network = ""
-            if target.find("@") > 0:
-                target,network = target.split("@",1)
-                if network.find("*") > -1:
-                    network = network[:-1]
-            ## if para 1 is * show all keys and there states
-            if target.find("*") > -1:
-                print " -------- nick/chan ------- -------- network ------- -ON- -CBC- -PROTECT- -------------------- Key --------------------"
-                for id,keys in self.__KeyMap.items():
-                    if id[0].startswith(target[:-1]) and id[1].startswith(network):
-                        print "  %-26.26s %-22.22s  %2.2s   %3.3s   %5.5s      %s" % (id[0],id[1],YESNO(keys.active),YESNO(keys.cbc_mode),YESNO(keys.protect_mode),keys.key)
+            if msg_obj.to_network and command == "NOTICE":
+                weechat.command(network,'/QUOTE NOTICE %s :%s' % (speaker,msg_obj.to_network))
+        return string
 
-                return xchat.EAT_ALL
-            ## else get the id for the target
-            id = self.get_id(nick=target)
-        
-        ## get the Key
-        key = self.find_key(id)
-        if key:
-            ## show Key for the specified chan/nick
-            print "[ %s ] Key: %s - Active: %s - CBC: %s - PROTECT: %s" % (key,key.key,YESNO(key.active),YESNO(key.cbc_mode),YESNO(key.protect_mode))
-        else:
-            print "No Key found"
-        return xchat.EAT_ALL
+    def prnt_message(self,data,buffer,date,tags,displayed,highlight,prefix,message):
+        debug ("prnt_message",data=data,buffer=buffer,date=date,tags=tags,displayed=displayed,highlight=highlight,prfix=prefix,message=message)
+        displayed=0
+        return weechat.WEECHAT_RC_OK
 
-    ## start the DH1080 Key Exchange
-    def key_exchange(self,word, word_eol, userdata):
-        id = self.get_id()
-        target,network = id
-        if len(word) >1:
-            target = word[1]
-            id = (target,network)
+    def out_message(self,data, modifier, modifier_data, string):
+        return string
 
-        ## fixme chan notice - what should happen when keyx is send to channel trillian seems to accept it and send me a key --
+    def cmd_handler(self,data, buffer, args):
+        debug ("cmd_handler",data=data,buffer=buffer,args=args)
+        ## compatibility with xchat
+        word = [data]
+        if len(args) > 0:
+            args = args.split(" ")
+            word += args
+        network = weechat.buffer_get_string(buffer, "localvar_server")
+        target = weechat.buffer_get_string(buffer, "localvar_channel")
+        debug("target,network,word: %r %r %r" % (target,network,word))
+        if data == "KEYX":
+            if len(word) > 1:
+                target = word[1]
+            return self.cmd_keyx(target,network,buffer)
+
+        return weechat.WEECHAT_RC_OK
+
+    def cmd_keyx(self,target,network,buffer):
+        debug("cmd_keyx:",target=target,network=network,buffer=buffer)
+        if not VALID_IRC_TARGET_RE.match(target):
+            debug("cmd_msg: no valid irc target")
+            return weechat.WEECHAT_RC_ERROR
+
+        ## FIXME chan notice - what should happen when keyx is send to channel trillian seems to accept it and send me a key --
         if target.startswith("#"):
-            print "Channel Exchange not implemented"
-            return xchat.EAT_ALL
+            prnt (_("Channel Exchange not implemented"))
+            return weechat.WEECHAT_RC_ERROR
 
-        ## create DH 
-        dh = DH1080Ctx()
+        msg_obj = self.key_manager.key_exchange(target,network)
 
-        self.__KeyMap[id] = self.find_key(id,create=SecretKey(dh,protectmode=self.config['DEFAULTPROTECT'],cbcmode=self.config['DEFAULTCBC']))
-        self.__KeyMap[id].keyname = id
-        self.__KeyMap[id].dh = dh
+        if msg_obj.message:
+            prnt("%s\tNotice: %s" % (target,msg_obj.message))
 
-        ## lock the target
-        self.__lock_proc(True)
-        ## send key with notice to target
-        xchat.command('NOTICE %s %s' % (target, dh1080_pack(dh)))
-        ## release the lock
-        self.__lock_proc(False)
-
-        ## save the key storage
-        self.saveDB()
-        return xchat.EAT_ALL
-
-
-    ## Answer to KeyExchange
-    def dh1080_init(self,word, word_eol, userdata):
-        id = self.get_id(nick=self.get_nick(word[0]))
-        target,network = id
-        message = word_eol[3]
-        key = self.find_key(id,create=SecretKey(None,protectmode=self.config['DEFAULTPROTECT'],cbcmode=self.config['DEFAULTCBC']))
-        ## Protection against a new key if "/PROTECTKEY" is on for nick
-        if key.protect_mode:
-            print "%sKEYPROTECTION: %s on %s" % (COLOR['red'],target,network)
-            xchat.command("notice %s %s KEYPROTECTION:%s %s" % (target,self.config['PLAINTEXTMARKER'],COLOR['red'],target))
-            return xchat.EAT_ALL
-
-        ## Stealth Check
-        if self.config['FISHSTEALTH']:
-            print "%sSTEALTHMODE: %s tried a keyexchange on %s" % (COLOR['green'],target,network)
-            return xchat.EAT_ALL
-
-        mirc_mode = False
-        try:
-            if word[5] == "CBC":
-                print "mIRC CBC KeyExchange detected."
-                message = "%s %s" % (word[3],word[4])
-                mirc_mode = True
-        except IndexError:
-            pass
-
-        dh = DH1080Ctx()
-        dh1080_unpack(message[1 : ], dh)
-        key.key = dh1080_secret(dh)
-        key.keyname = id
-
-        ## lock the target
-        self.__lock_proc(True)
-        ## send key with notice to target
-        #print "SEND PUBKEY: %r" % dh.public
-        if mirc_mode:
-            xchat.command('NOTICE %s %s CBC' % (target, dh1080_pack(dh)))
-        else:
-            xchat.command('NOTICE %s %s' % (target, dh1080_pack(dh)))
-            
-        ## release the lock
-        self.__lock_proc(False)
-        self.__KeyMap[id] = key
-        print "DH1080 Init: %s on %s" % (target,network)
-        print "Key set to %r" % (key.key,)
-        ## save key storage
-        self.saveDB()
-        return xchat.EAT_ALL
-
-    ## Answer from targets init
-    def dh1080_finish(self,word, word_eol, userdata):
-        id = self.get_id(nick=self.get_nick(word[0]))
-        message = word_eol[3]
-        target,network = id
-        ## fixme if not explicit send to the Target the received key is discarded - chan exchange 
-        if id not in self.__KeyMap:
-            print "Invalid DH1080 Received from %s on %s" % (target,network)
-            return xchat.EAT_NONE
-        key = self.__KeyMap[id]
-        dh1080_unpack(message[1 : ], key.dh)
-        key.key = dh1080_secret(key.dh)
-        key.keyname = id
-        print "DH1080 Finish: %s on %s" % (target,network)
-        print "Key set to %r" % (key.key,)
-        ## save key storage
-        self.saveDB()
-        return xchat.EAT_ALL
-
-    ## set cbc mode or show the status
-    def set_cbc(self,word, word_eol, userdata):
-        ## check for parameter
-        if len(word) >2:
-            # if both specified first is target second is mode on/off
-            target = word[1]
-            mode = word[2]
-        else:
-            ## if no target defined target is current chan/nick
-            target = None
-            if len(word) >1:
-                ## if one parameter set mode to it else show only
-                mode = word[1]
-
-        id = self.get_id(nick=target)
-        target,network = id
-        ## check if there is a key
-        key = self.find_key(id)
-        if not key:
-            print "No Key found for %r" % (target,)
-        else:
-            ## if no parameter show only status
-            if len(word) == 1:
-                print "CBC Mode is %s" % ((key.cbc_mode and "on" or "off"),)
-            else:
-                ## set cbc mode to on/off
-                key.cbc_mode = bool(mode in ONMODES)
-                print "set CBC Mode for %s to %s" % (target,(key.cbc_mode == True and "on") or "off")
-                ## save key storage
-                self.saveDB()
-        return xchat.EAT_ALL
-
-    ## set key protection mode or show the status
-    def set_protect(self,word, word_eol, userdata):
-        ## check for parameter
-        if len(word) >2:
-            # if both specified first is target second is mode on/off
-            target = word[1]
-            mode = word[2]
-        else:
-            ## if no target defined target is current nick, channel is not allowed/possible yet
-            target = None
-            if len(word) >1:
-                ## if one parameter set mode to it else show only
-                mode = word[1]
-
-        id = self.get_id(nick=target)
-        target,network = id
-        if "#" in target:
-            print "We don't make channel protection. Sorry!"
-            return xchat.EAT_ALL
+        if not msg_obj.to_network:
+            return weechat.WEECHAT_RC_OK
         
-        key = self.find_key(id)
-        ## check if there is a key
-        if not key:
-            print "No Key found for %r" % (target,)
-        else:
-            ## if no parameter show only status
-            if len(word) == 1:
-                print "KEY Protection is %s" % ((key.protect_mode and "on" or "off"),)
-            else:
-                ## set KEY Protection mode to on/off
-                key.protect_mode = bool(mode in ONMODES)
-                print "set KEY Protection for %s to %s" % (target,(key.protect_mode == True and "on") or "off")
-                ## save key storage
-                self.saveDB()
-        return xchat.EAT_ALL
+        ## send key with notice to target
+        debug("sending %r" %'QUOTE NOTICE %s %s' % (target, msg_obj.to_network))
+        weechat.command(network,'/QUOTE NOTICE %s %s' % (target, msg_obj.to_network))
+        return weechat.WEECHAT_RC_OK
 
+    def __del__(self):
+        weechat.prnt("", _("\x19*03,00 fishcrypt.py successful unloaded"))
 
-    ## activate/deaktivate encryption für chan/nick
-    def set_act(self,word, word_eol, userdata):
-        ## if two parameter first is target second is mode on/off
-        if len(word) >2:
-            target = word[1]
-            mode = word[2]
-        else:
-            ## target is current chan/nick 
-            target = None
-            if len(word) >1:
-                ## if one parameter set mode to on/off
-                mode = word[1]
-
-        id = self.get_id(nick=target)
-        target,network = id
-        key = self.find_key(id)
-        ## key not found
-        if not key:
-            print "No Key found for %r" % (target,)
-        else:
-            if len(word) == 1:
-                ## show only
-                print "Encryption is %s" % ((key.active and "on" or "off"),)
-            else:
-                ## set mode to on/off 
-                key.active = bool(mode in ONMODES)
-                print "set Encryption for %s to %s" % (target,(key.active == True and "on") or "off")
-                ## save key storage
-                self.saveDB()
-        return xchat.EAT_ALL
-
-    ## handle topic server message
-    def server_332_topic(self,word, word_eol, userdata):
-        ## check if allready processing
-        if self.__chk_proc():
-            return xchat.EAT_NONE
-        server, cmd, nick, channel, topic = word[0], word[1], word[2], word[3], word_eol[4]
-        ## check if topic is crypted
-        if not topic.startswith(':+OK ') and not topic.startswith(':mcps '):
-            return xchat.EAT_NONE
-        id = self.get_id(nick=channel)
-        ## look for a key
-        key = self.find_key(id,create=SecretKey(None))
-        ## if no key exit
-        if not key.key:
-            return xchat.EAT_NONE
-        ## decrypt
-        topic = self.decrypt(key, topic[1:])
-        ##todo utf8 check for illegal chars
-        if not topic:
-            return xchat.EAT_NONE
-        ## lock the target
-        self.__lock_proc(True)
-        ## send the message to xchat
-        xchat.command('RECV %s %s %s %s :%s' % (server, cmd, nick, channel, topic.replace("\x00","")))
-        ## release the lock
-        self.__lock_proc(False)
-        return xchat.EAT_ALL
-
-    ## trace nick changes
-    def nick_trace(self,word, word_eol, userdata):
-        old, new = word[0], word[1]
-        ## create id's for old and new nick
-        oldid,newid = (self.get_id(nick=old),self.get_id(nick=new))
-        target, network = newid
-        networkmap = self.__TargetMap.get(network,None)
-        if not networkmap:
-            networkmap = {}
-            self.__TargetMap[network] = networkmap
-        key = self.__KeyMap.get(oldid,None)
-        if not key:
-            lastaxx,key = networkmap.get(old,(-1,None))
-        if key:
-            ## make the new nick the entry the old
-            networkmap[new] = (int(time.time()),key)
-            try:
-                del networkmap[old]
-            except KeyError:
-                pass
-            ## save key storage
-            self.saveDB()
-        return xchat.EAT_NONE
-
-## Preliminaries.
 
 class MalformedError(Exception):
     pass
 
 
-def sha256(s):
-    """sha256"""
-    return hashlib.sha256(s).digest()
+class block_cipher(object):
+    blocksize = 8
+    def pad(self,data):
+         data = "%s%s" % (data,'\x00' * (self.blocksize - len(data) % self.blocksize))
+         assert len(data) % self.blocksize == 0
+         return data
+
+    def fix_padding(self,data):
+        pad_err = len(data) % self.blocksize
+        if pad_err:
+            debug("block_cipher: padding_error: len:%r  %r" % (len(data),pad_err))
+            cut = (pad_err)*-1
+            data = data[:cut]
+        return data
+
+class Blowfish(block_cipher):
+    def __init__(self, key):
+        self.blowfish = cBlowfish.new(key)
+
+    def decrypt(self, data):
+        return self.decrypt_mode(
+            self.blowfish.decrypt,
+                self.fix_padding(data)
+            ).strip('\x00')
+
+    def encrypt(self, data):
+        debug ("Blowfish.encrypt: %r" % data)
+        return self.encrypt_mode(self.blowfish.encrypt,self.pad(data))
+
+    def decrypt_mode(self,func, data):
+        return func(data)
+
+    def encrypt_mode(self,func, data):
+        return func(data)
+
+class BlowfishCBC(Blowfish):
+    def encrypt_mode(self,func, data):
+        """The CBC mode. The randomy generated IV is prefixed to the ciphertext.
+        'func' is a function that encrypts data in ECB mode. 'data' is the
+        plaintext. 'blocksize' is the block size of the cipher."""
+        assert len(data) % self.blocksize == 0
+        IV = os.urandom(self.blocksize)
+        assert len(IV) == self.blocksize
+        ciphertext = IV
+        while data:
+            xored = xorstring(data[:self.blocksize], IV)
+            enc = func(xored)
+            ciphertext += enc
+            IV = enc
+            data = data[self.blocksize:]
+        assert len(ciphertext) % self.blocksize == 0
+        return ciphertext
 
 
-def int2bytes(n):
-    """Integer to variable length big endian."""
-    if n == 0:
-        return '\x00'
-    b = []
-    while n:
-        b.insert(0,chr(n % 256))
-        n /= 256
-    return "".join(b)
-
-
-def bytes2int(b):
-    """Variable length big endian to integer."""
-    n = 0
-    for p in b:
-        n *= 256
-        n += ord(p)
-    return n
-
-def padto(msg, length):
-    """Pads 'msg' with zeroes until it's length is divisible by 'length'.
-    If the length of msg is already a multiple of 'length', does nothing."""
-    L = len(msg)
-    if L % length:
-        msg = "%s%s" % (msg,'\x00' * (length - L % length))
-    assert len(msg) % length == 0
-    return msg
-
-def cbc_encrypt(func, data, blocksize):
-    """The CBC mode. The randomy generated IV is prefixed to the ciphertext.
-    'func' is a function that encrypts data in ECB mode. 'data' is the
-    plaintext. 'blocksize' is the block size of the cipher."""
-    assert len(data) % blocksize == 0
-    
-    IV = os.urandom(blocksize)
-    assert len(IV) == blocksize
-    
-    ciphertext = IV
-    for block_index in xrange(len(data) / blocksize):
-        xored = xorstring(data[:blocksize], IV)
-        enc = func(xored)
+    def decrypt_mode(self,func, data):
+        """See cbc_encrypt."""
+        assert len(data) % self.blocksize == 0
         
-        ciphertext += enc
-        IV = enc
-        data = data[blocksize:]
+        IV = data[0:self.blocksize]
+        data = data[self.blocksize:]
 
-    assert len(ciphertext) % blocksize == 0
-    return ciphertext
+        plaintext = ''
+        while data:
+            text = func(data[0:self.blocksize])
+            plaintext += xorstring(text, IV)
+            IV = data[0:self.blocksize]
+            data = data[self.blocksize:]
+        assert len(plaintext) % self.blocksize == 0
+        return plaintext
 
-
-def cbc_decrypt(func, data, blocksize):
-    """See cbc_encrypt."""
-    assert len(data) % blocksize == 0
-    
-    IV = data[0:blocksize]
-    data = data[blocksize:]
-
-    plaintext = ''
-    for block_index in xrange(len(data) / blocksize):
-        temp = func(data[0:blocksize])
-        temp2 = xorstring(temp, IV)
-        plaintext += temp2
-        IV = data[0:blocksize]
-        data = data[blocksize:]
-    
-    assert len(plaintext) % blocksize == 0
-    return plaintext
-
-
-class Blowfish:
-    def __init__(self, key=None):
-        if key:
-            self.blowfish = cBlowfish.new(key)
-
-    def decrypt(self, data):
-        return self.blowfish.decrypt(data)
-    
-    def encrypt(self, data):
-        return self.blowfish.encrypt(data)
-
-
-class BlowfishCBC:
-    
-    def __init__(self, key=None):
-        if key:
-            self.blowfish = cBlowfish.new(key)
-
-    def decrypt(self, data):
-        return cbc_decrypt(self.blowfish.decrypt, data, 8)
-    
-    def encrypt(self, data):
-        return cbc_encrypt(self.blowfish.encrypt, data, 8)
 
 ## blowcrypt, Fish etc.
 # XXX: Unstable.
@@ -1720,290 +1555,185 @@ def blowcrypt_b64decode(s):
         s = s[12:]
     return "".join(res)
 
-def blowcrypt_pack(msg, cipher):
-    """."""
-    return '+OK %s' % (blowcrypt_b64encode(cipher.encrypt(padto(msg, 8))))
 
-def blowcrypt_unpack(msg, cipher):
-    """."""
-    if not (msg.startswith('+OK ') or msg.startswith('mcps ')):
-        raise ValueError
-    _, rest = msg.split(' ', 1)
-    if (len(rest) % 12):
-        raise MalformedError
+class dh1080_token(object):
+    def __init__(self,private,public):
+        self.private = private
+        self.public = public
+        self.remote_public = 0
+        self.state = 0
+        self.secret = 0
+        self.expires = int(time.time()) + 60
 
-    try:
-        raw = blowcrypt_b64decode(rest)
-    except TypeError:
-        raise MalformedError
-    if not raw:
-        raise MalformedError
-
-    try:
-        plain = cipher.decrypt(raw)
-    except ValueError:
-        raise MalformedError
-    
-    return plain.strip('\x00')
-
-## Mircryption-CBC
-def mircryption_cbc_pack(msg, cipher):
-    """."""
-    padded = padto(msg, 8)
-    return '+OK *%s' % (base64.b64encode(cipher.encrypt(padded)))
-
-
-def mircryption_cbc_unpack(msg, cipher):
-    """."""
-    if not (msg.startswith('+OK *') or msg.startswith('mcps *')):
-        raise ValueError
-
-    try:
-        _, coded = msg.split('*', 1)
-        raw = base64.b64decode(coded)
-    except TypeError:
-        raise MalformedError
-    if not raw:
-        raise MalformedError
-
-    try:
-        padded = cipher.decrypt(raw)
-    except ValueError:
-        raise MalformedError
-    if not padded:
-        raise MalformedError
-
-    return padded.strip('\x00')
+    def get_secret(self):
+        return self.secret
 
 ## DH1080
-g_dh1080 = 2
-p_dh1080 = int('FBE1022E23D213E8ACFA9AE8B9DFAD'
-               'A3EA6B7AC7A7B7E95AB5EB2DF85892'
-               '1FEADE95E6AC7BE7DE6ADBAB8A783E'
-               '7AF7A7FA6A2B7BEB1E72EAE2B72F9F'
-               'A2BFB2A2EFBEFAC868BADB3E828FA8'
-               'BADFADA3E4CC1BE7E8AFE85E9698A7'
-               '83EB68FA07A77AB6AD7BEB618ACF9C'
-               'A2897EB28A6189EFA07AB99A8A7FA9'
-               'AE299EFA7BA66DEAFEFBEFBF0B7D8B', 16)
-q_dh1080 = (p_dh1080 - 1) / 2 
-
-def dh1080_b64encode(s):
-    """A non-standard base64-encode."""
-    b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-    d = [0]*len(s)*2
-
-    L = len(s) * 8
-    m = 0x80
-    i, j, k, t = 0, 0, 0, 0
-    while i < L:
-        if ord(s[i >> 3]) & m:
-            t |= 1
-        j += 1
-        m >>= 1
-        if not m:
-            m = 0x80
-        if not j % 6:
-            d[k] = b64[t]
-            t &= 0
-            k += 1
-        t <<= 1
-        t %= 0x100
-        #
-        i += 1
-    m = 5 - j % 6
-    t <<= m
-    t %= 0x100
-    if m:
-        d[k] = b64[t]
-        k += 1
-    d[k] = 0
-    res = []
-    for q in d:
-        if q == 0:
-            break
-        res.append(q)
-    return "".join(res)
-
-def dh1080_b64decode(s):
-    """A non-standard base64-encode."""
-    b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-    buf = [0]*256
-    for i in range(64):
-        buf[ord(b64[i])] = i
-
-    L = len(s)
-    if L < 2:
-        raise ValueError
-    for i in reversed(range(L-1)):
-        if buf[ord(s[i])] == 0:
-            L -= 1
-        else:
-            break
-    if L < 2:
-        raise ValueError
-
-    d = [0]*L
-    i, k = 0, 0
-    while True:
-        i += 1
-        if k + 1 < L:
-            d[i-1] = buf[ord(s[k])] << 2
-            d[i-1] %= 0x100
-        else:
-            break
-        k += 1
-        if k < L:
-            d[i-1] |= buf[ord(s[k])] >> 4
-        else:
-            break
-        i += 1
-        if k + 1 < L:
-            d[i-1] = buf[ord(s[k])] << 4
-            d[i-1] %= 0x100
-        else:
-            break
-        k += 1
-        if k < L:
-            d[i-1] |= buf[ord(s[k])] >> 2
-        else:
-            break
-        i += 1
-        if k + 1 < L:
-            d[i-1] = buf[ord(s[k])] << 6
-            d[i-1] %= 0x100
-        else:
-            break
-        k += 1
-        if k < L:
-            d[i-1] |= buf[ord(s[k])] % 0x100
-        else:
-            break
-        k += 1
-    return ''.join(map(chr, d[0:i-1]))
-
-
-def dh_validate_public(public, q, p):
-    """See RFC 2631 section 2.1.5."""
-    return 1 == pow(public, q, p)
-
-
-class DH1080Ctx:
-    """DH1080 context."""
+class dh1080_manager(object):
     def __init__(self):
-        self.public = 0
-        self.private = 0
-        self.secret = 0
-        self.state = 0
-        
-        bits = 1080
+        self.g_dh1080 = 2
+        #self.p_dh1080 = int('FBE1022E23D213E8ACFA9AE8B9DFADA3EA6B7AC7A7B7E95AB5EB2DF858921FEADE95E6AC7BE7DE6ADBAB8A783E7AF7A7FA6A2B7BEB1E72EAE2B72F9FA2BFB2A2EFBEFAC868BADB3E828FA8BADFADA3E4CC1BE7E8AFE85E9698A783EB68FA07A77AB6AD7BEB618ACF9CA2897EB28A6189EFA07AB99A8A7FA9AE299EFA7BA66DEAFEFBEFBF0B7D8B', 16)
+        self.p_dh1080 = self.string_to_long(self.b64decode("++ECLiPSE+is+proud+to+present+latest+FiSH+release+featuring+even+more+security+for+you+++shouts+go+out+to+TMG+for+helping+to+generate+this+cool+sophie+germain+prime+number++++/C32L"))
+        self.q_dh1080 = (self.p_dh1080 - 1) / 2 
+        self.bits = 1080
+        self.db = {}
+
+    def string_to_long(self,s):
+        return long(binascii.hexlify(s),16)
+
+    def make_hex_even(self,x):
+        ##fix missing zero and make hexstring even
+        return  len(x) % 2 == 0 and x or "0%s" % x
+
+    def long_to_string(self,n):
+        return binascii.unhexlify(self.make_hex_even("%.2x" % n))
+
+    def sha256(self,s):
+        return hashlib.sha256(s).digest()
+
+    def b64decode(self,s):
+        s_len = len(s)
+        if s_len % 4 == 1 and s.endswith("A"):
+            s = s[:-1]
+        s = "%s%s" % (s,"="*(4-(s_len % 4)))
+        return s.decode("base64")
+
+    def b64encode(self,s):
+        s = s.encode("base64")
+        s = s.replace("\n","")
+        if not s.endswith("="):
+            s = "%sA" % s
+        return s.replace("=","")
+
+    def dh_validate_public(self,publickey):
+        """See RFC 2631 section 2.1.5."""
+        return 1 == pow(publickey, self.q_dh1080, self.p_dh1080)
+
+    def set_remote_pub_key(self,target,remote_public_key):
+        debug("set_remote_pub_key %r" % remote_public_key)
+        token = self.db.get(target)
+        if not token:
+            raise CryptoError(_("No such target %r") % target)
+        if not 1 < remote_public_key < self.p_dh1080:
+            raise MalformedError
+        if not self.dh_validate_public(remote_public_key):
+            prnt(_("Key does not validate per RFC 2631. This check is not performed by any DH1080 implementation, so we use the key anyway. See RFC 2785 for more details."))
+        token.remote_public = remote_public_key
+
+    def get_secret(self,target):
+        token = self.db.get(target)
+        if not token:
+            raise CryptoError(_("No such target %r") % target)
+        assert token.remote_public > 0
+        if token.expires > time.time():
+            token.secret = pow(token.remote_public, token.private,self.p_dh1080)
+            _key = self.b64encode(
+                self.sha256(
+                    self.long_to_string(token.secret)
+                )
+            )
+        else:
+            prnt("DH1080 exchange Token expired")
+            _key = None
+        del token
+        debug("token_db: %r" % self.db)
+        return _key
+
+    def gen_keypair(self,target):
+        private = 0
+        public = 0
+        debug("dh1080.gen_keypair")
         while True:
-            self.private = bytes2int(os.urandom(bits/8))
-            self.public = pow(g_dh1080, self.private, p_dh1080)
-            if 2 <= self.public <= p_dh1080 - 1 and \
-               dh_validate_public(self.public, q_dh1080, p_dh1080) == 1:
+            private = self.string_to_long(os.urandom(self.bits/8))
+            public = pow(self.g_dh1080, private, self.p_dh1080)
+            if 2 <= public <= self.p_dh1080 - 1 and self.dh_validate_public(public) == 1:
                 break
+        token = dh1080_token(private,public)
+        self.db[target] = token
+        return token
 
-def dh1080_pack(ctx):
-    """."""
-    if ctx.state == 0:
-        ctx.state = 1
-        cmd = "DH1080_INIT"
-    else:
-        cmd = "DH1080_FINISH"
-    return "%s %s" % (cmd,dh1080_b64encode(int2bytes(ctx.public)))
-
-def dh1080_unpack(msg, ctx):
-    """."""
-    if not msg.startswith("DH1080_"):
-        raise ValueError
-
-    invalidmsg = "Key does nottmvalidate per RFC 2631. This check is not performed by any DH1080 implementation, so we use the key anyway. See RFC 2785 for more details."
-
-    if ctx.state == 0:
-        if not msg.startswith("DH1080_INIT "):
-            raise MalformedError
-        ctx.state = 1
+    def destroy(self,target):
         try:
-            cmd, public_raw = msg.split(' ', 1)
-            public = bytes2int(dh1080_b64decode(public_raw))
+            del self.db[target]
+        except KeyError:
+            ## should not happen
+            debug("ERROR: key %r was previously destroyed" % target)
+            pass
+        debug("debug_destroy: %r" % self.db)
 
-            if not 1 < public < p_dh1080:
-                raise MalformedError
+    def pack(self,prefix,token):
+        return "%s %s" % (prefix,self.b64encode(self.long_to_string(token.public)))
+
+    def unpack(self,message):
+        #debug("dh1080unpack: %r" % message)
+        return self.string_to_long(self.b64decode(message))
+
+
+
+def destroy_client_interface(userdata=None):
+    global CLIENTINTERFACE
+    #for k,v in globals().iteritems():
+    #    if str(v).find("object") > -1: 
+    #        prnt ("%-20s %s" % (k,v))
+
+    del CLIENTINTERFACE
+    return False
+
+
+if  __name__ == "__main__":
+    try:
+        import xchat
+        def get_query_context(name):
+            for c in xrange(2):
+                if len(name) == 0:
+                    name = None
+                ctx = xchat.find_context(channel=name)
+                if ctx:
+                    return ctx
+                try:
+                    setTabsetting = xchat.get_prefs('tab_new_to_front')
+                    xchat.command("SET -quiet tab_new_to_front 0")
+                    xchat.command("QUERY %s" % (name,))
+                finally:
+                    xchat.command("SET -quiet tab_new_to_front %s" % setTabsetting)
+            return None
+        def prnt(msg,tochannel=''):
+            ctx = get_query_context(tochannel)
+            if not ctx:
+                print debug_message
+            else:
+                ctx.prnt(str(msg))
+
+        __module_name__ = SCRIPT_NAME
+        __module_version__ = SCRIPT_VERSION
+        __module_description__ = SCRIPT_DESC
+        CLIENTINTERFACE = xchat_client_interface()
+    except ImportError:
+        try:
+            import weechat
+            def prnt(msg,tochannel=''):
+                buf = weechat.buffer_search('python',tochannel)
+                if not buf:
+                    buf = weechat.buffer_new(tochannel,"","","","")
+                weechat.prnt(buf,"%s" % msg)
+            CONFIG_FILE_NAME = SCRIPT_NAME
+            CLIENTINTERFACE = weechat_client_interface()
+            def weechat_unload_helper():
+                return CLIENTINTERFACE.unload_interface()
+
+            def weechat_server_message_helper(data, modifier, modifier_data, string):
+                return CLIENTINTERFACE.server_message(data, modifier, modifier_data, string)
+
+            def weechat_prnt_message_helper(data,buffer,date,tags,displayed,highlight,prefix,message):
+                return CLIENTINTERFACE.prnt_message(data,buffer,date,tags,displayed,highlight,prefix,message)
+
+            def weechat_outmessage_helper(data, modifier, modifier_data, string):
+                return CLIENTINTERFACE.out_message(data, modifier, modifier_data, string)
             
-            if not dh_validate_public(public, q_dh1080, p_dh1080):
-                print invalidmsg
-                pass
-                
-            ctx.secret = pow(public, ctx.private, p_dh1080)
-        except:
-            raise MalformedError
+            def weechat_command_helper(data, buffer, args):
+                return CLIENTINTERFACE.cmd_handler(data, buffer,args)
 
-    elif ctx.state == 1:
-        if not msg.startswith("DH1080_FINISH "):
-            raise MalformedError
-        ctx.state = 1
-        try:
-            cmd, public_raw = msg.split(' ', 1)
-            public = bytes2int(dh1080_b64decode(public_raw))
-
-            if not 1 < public < p_dh1080:
-                raise MalformedError
-
-            if not dh_validate_public(public, q_dh1080, p_dh1080):
-                print invalidmsg
-                pass
-            
-            ctx.secret = pow(public, ctx.private, p_dh1080)
-        except:
-            raise MalformedError
-
-    return True
-        
-
-def dh1080_secret(ctx):
-    """."""
-    if ctx.secret == 0:
-        raise ValueError
-    return dh1080_b64encode(sha256(int2bytes(ctx.secret)))
-
-if REQUIRESETUP:
-    __install_thread = None
-    def _install_pyBlowfish(urllib2,doExtra):
-        global __install_thread
-        if __install_thread:
-            print "Install is allready running"
-            return
-        __install_thread = Thread(target=__install_pyBlowfish,kwargs={'urllib2':urllib2,'context':xchat.get_context()})
-        __install_thread.start()
-    def __install_pyBlowfish(urllib2,context):
-        global __install_thread
-        context.prnt("\0038.....checking for pyBlowfish.py at %r... please wait ...." % PYBLOWFISHURL)
-        try:
-            __script = urllib2.urlopen(PYBLOWFISHURL,timeout=40).read()
-            try:
-                __fd = open("%s%spyBlowfish.py" % (path,sep),"wb")
-                __fd.write(__script)
-                print "\002\0033Please type /py reload %s" % script
-            finally:
-                __fd.close()
-        except urllib2.URLError,err:
-            print err
-
-        except:
-            context.prnt( "\002\0034INSTALL FAILED" )
-            raise
-        __install_thread = None
-
-    def fishsetup(word, word_eol, userdata):
-        useproxy = True
-        if len(word) >1:
-            if word[1].lower() == "noproxy":
-                useproxy = False
-        proxyload(_install_pyBlowfish,useproxy,None)
-        return xchat.EAT_ALL
-    xchat.hook_command('FISHSETUP', fishsetup)
-else:    
-    loadObj = XChatCrypt()
+        except ImportError:
+            sys.exit("should be run from xchat or weechat with python enabled")
 
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
